@@ -26,6 +26,8 @@ type Interface interface {
 	Clusters() ClusterInformer
 	// RealClusters returns a RealClusterInformer.
 	RealClusters() RealClusterInformer
+	// VirtualClusters returns a VirtualClusterInformer.
+	VirtualClusters() VirtualClusterInformer
 }
 
 type version struct {
@@ -47,4 +49,9 @@ func (v *version) Clusters() ClusterInformer {
 // RealClusters returns a RealClusterInformer.
 func (v *version) RealClusters() RealClusterInformer {
 	return &realClusterInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// VirtualClusters returns a VirtualClusterInformer.
+func (v *version) VirtualClusters() VirtualClusterInformer {
+	return &virtualClusterInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

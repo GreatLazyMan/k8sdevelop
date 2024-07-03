@@ -23,3 +23,7 @@ type ClusterListerExpansion interface{}
 // RealClusterListerExpansion allows custom methods to be added to
 // RealClusterLister.
 type RealClusterListerExpansion interface{}
+
+// VirtualClusterListerExpansion allows custom methods to be added to
+// VirtualClusterLister.
+type VirtualClusterListerExpansion interface{}

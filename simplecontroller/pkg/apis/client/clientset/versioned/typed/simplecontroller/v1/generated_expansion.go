@@ -19,3 +19,5 @@ package v1
 type ClusterExpansion interface{}
 
 type RealClusterExpansion interface{}
+
+type VirtualClusterExpansion interface{}

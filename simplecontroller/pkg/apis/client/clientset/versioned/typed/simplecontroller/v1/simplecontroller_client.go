@@ -28,6 +28,7 @@ type GreatlazymanV1Interface interface {
 	RESTClient() rest.Interface
 	ClustersGetter
 	RealClustersGetter
+	VirtualClustersGetter
 }
 
 // GreatlazymanV1Client is used to interact with features provided by the greatlazyman.io group.
@@ -41,6 +42,10 @@ func (c *GreatlazymanV1Client) Clusters() ClusterInterface {
 
 func (c *GreatlazymanV1Client) RealClusters() RealClusterInterface {
 	return newRealClusters(c)
+}
+
+func (c *GreatlazymanV1Client) VirtualClusters() VirtualClusterInterface {
+	return newVirtualClusters(c)
 }
 
 // NewForConfig creates a new GreatlazymanV1Client for the given config.

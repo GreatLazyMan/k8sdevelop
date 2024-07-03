@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	RealClusterKind string = "RealCluster"
+	VirtualClusterKind string = "VirtualCluster"
 )
 
 // +genclient
@@ -14,19 +14,19 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:printcolumn:name="IP_FAMILY",type=string,JSONPath=`.spec.Options.ipFamily`
 
-type RealCluster struct {
+type VirtualCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec is the specification for the behaviour of the real cluster.
-	Spec RealClusterSpec `json:"spec"`
+	// Spec is the specification for the behaviour of the virtual cluster.
+	Spec VirtualClusterSpec `json:"spec"`
 
-	// Status describes the current status of a real cluster.
+	// Status describes the current status of a virtual cluster.
 	// +optional
-	Status RealClusterStatus `json:"status"`
+	Status VirtualClusterStatus `json:"status"`
 }
 
-type RealClusterSpec struct {
+type VirtualClusterSpec struct {
 	// +optional
 	Kubeconfig []byte `json:"kubeconfig,omitempty"`
 
@@ -35,7 +35,7 @@ type RealClusterSpec struct {
 	Namespace string `json:"namespace"`
 }
 
-type RealClusterStatus struct {
+type VirtualClusterStatus struct {
 	// SubStatus contain some information
 	// +optional
 	SubStatus SubStatus `json:"subStatus,omitempty"`
@@ -43,8 +43,8 @@ type RealClusterStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type RealClusterList struct {
+type VirtualClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-	Items           []RealCluster `json:"items"`
+	Items           []VirtualCluster `json:"items"`
 }
