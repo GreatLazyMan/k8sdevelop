@@ -100,12 +100,12 @@ func (c *RClusterController) syncToStdout(key RCCluster) error {
 	}
 
 	var name string
-	switch obj.(type) {
+	switch v := obj.(type) {
 	case *simplecontrollerv1.RealCluster:
-		name = obj.(*simplecontrollerv1.RealCluster).GetName()
+		name = v.GetName()
 		klog.Info("receive RealCluster ptr")
 	case *simplecontrollerv1.VirtualCluster:
-		name = obj.(*simplecontrollerv1.VirtualCluster).GetName()
+		name = v.GetName()
 		klog.Info("receive VirtualCluster ptr")
 	}
 
