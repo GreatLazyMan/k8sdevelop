@@ -23,7 +23,7 @@ data:
   net-conf.json: |
     {
       "Backend": {
-        "Type": "vxlan"
+        "Type": "bridge"
       }
     }
 kind: ConfigMap

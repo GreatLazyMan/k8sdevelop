@@ -27,7 +27,7 @@ spec:
                 - linux
       containers:
       - command:
-        - /opt/bin/simplecni
+        - /usr/local/bin/simplecni
         - --ip-masq
         env:
         - name: POD_NAME
@@ -69,8 +69,8 @@ spec:
       initContainers:
       - args:
         - -r
-        - /opt/cni/bin
-        - /opt/cni/bin
+        - /cni/bin
+        - /opt/cni/
         command:
         - cp
         image: simplecni:v0.0.1
