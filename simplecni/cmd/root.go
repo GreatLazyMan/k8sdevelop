@@ -1,16 +1,32 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
+	"context"
+	"flag"
+	"fmt"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
+	"github.com/GreatLazyMan/simplecni/pkg/backend"
+	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/spf13/cobra"
+	log "k8s.io/klog/v2"
 )
 
+type CmdLineOpts struct {
+	IpMasq     bool
+	ConfigPath string
+}
 
+type NetworkBackend struct {
+	Type string
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -24,10 +40,41 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return run()
+	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
+var (
+	opts CmdLineOpts
+)
+
+func copypflag(dstFlagSet *flag.FlagSet, srcFlagSet *flag.FlagSet, name string) {
+	dstFlagSet.Var(srcFlagSet.Lookup(name).Value, srcFlagSet.Lookup(name).Name, srcFlagSet.Lookup(name).Usage)
+}
+
+func init() {
+	cniFlags := rootCmd.Flags()
+	cniFlags.BoolVar(&opts.IpMasq, "ip-masq", true, "setup IP masquerade rule for traffic destined outside of overlay network")
+	cniFlags.StringVar(&opts.ConfigPath, "configpath", "/etc/simplecni/net-conf.json", "the config json path")
+	// add klog pflag into commandline pflag
+	log.InitFlags(nil)
+	klogFlagSet := flag.NewFlagSet("klog", flag.ExitOnError)
+	//// Only copy the non file logging options from klog
+	copypflag(klogFlagSet, flag.CommandLine, "v")
+	copypflag(klogFlagSet, flag.CommandLine, "vmodule")
+	copypflag(klogFlagSet, flag.CommandLine, "log_backtrace_at")
+	cniFlags.AddGoFlagSet(klogFlagSet)
+	// klog will log to tmp files by default. override so all entries
+	// can flow into journald (if running under systemd)
+	err := flag.Set("logtostderr", "true")
+	if err != nil {
+		log.Errorf("Can't set the logtostderr pflagL %v", err)
+		os.Exit(1)
+	}
+}
+
+// Execute adds all child commands to the root command and sets pflags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	err := rootCmd.Execute()
@@ -36,16 +83,68 @@ func Execute() {
 	}
 }
 
-func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+func shutdownHandler(ctx context.Context, sigs chan os.Signal, cancel context.CancelFunc) {
+	// Wait for the context do be Done or for the signal to come in to shutdown.
+	select {
+	case <-ctx.Done():
+		log.Info("Stopping shutdownHandler...")
+	case <-sigs:
+		// Call cancel on the context to close everything down.
+		cancel()
+		log.Info("shutdownHandler sent cancel signal...")
+	}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cmd.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// Unregister to get default OS nuke behaviour in case we don't exit cleanly
+	signal.Stop(sigs)
 }
 
+func run() error {
+	// This is the main context that everything should run in.
+	// All spawned goroutines should exit when cancel is called on this context.
+	// Go routines spawned from main.go coordinate using a WaitGroup. This provides a mechanism to allow the shutdownHandler goroutine
+	// to block until all the goroutines return . If those goroutines spawn other goroutines then they are responsible for
+	// blocking and returning only when cancel() is called.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
+	// Register for SIGINT and SIGTERM
+	log.Info("Installing signal handlers")
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+
+	netConf, err := os.ReadFile(opts.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read net conf: %v", err)
+	}
+	sc, err := netconfig.ParseConfig(string(netConf))
+	if err != nil {
+		return fmt.Errorf("error parsing subnet config: %s", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		shutdownHandler(ctx, sigs, cancel)
+		wg.Done()
+	}()
+
+	backend := backend.NewNetworkBackend(sc)
+	log.Info("Running backend.")
+	wg.Add(1)
+	go func() {
+		backend.Run(ctx)
+		wg.Done()
+	}()
+
+	_, err = daemon.SdNotify(false, "READY=1")
+	if err != nil {
+		log.Errorf("Failed to notify systemd the message READY=1 %v", err)
+	}
+	log.Info("Waiting for all goroutines to exit")
+	// Block waiting for all the goroutines to finish.
+	wg.Wait()
+	log.Info("Exiting cleanly...")
+	os.Exit(0)
+
+	return nil
+}

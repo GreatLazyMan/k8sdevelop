@@ -32,4 +32,3 @@ metadata:
     app: simplecni
   name: simplecni-cfg
   namespace: kube-system
-

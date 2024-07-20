@@ -203,8 +203,10 @@ func leaderElectionRun(ctx context.Context, opts *options.Options) error {
 func run(ctx context.Context, mgr manager.Manager) error {
 
 	cherr := make(chan error)
+	//controller-runtime style
 	go controllerruntimeRun(ctx, mgr, cherr)
 
+	//informer style
 	go informerRun(ctx, cherr, mgr.GetConfig())
 
 	return <-cherr
