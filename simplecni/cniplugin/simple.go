@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	defaultSubnetFile = "/run/simple/subnet.env"
+	defaultSubnetFile = "/var/run/simplecni/subnet.env"
 	defaultDataDir    = "/var/lib/cni/simple"
 )
 

@@ -4,9 +4,11 @@ go 1.22.1
 
 require (
 	github.com/containernetworking/cni v1.2.2
+	github.com/containernetworking/plugins v1.5.1
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
+	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/net v0.25.0
 	k8s.io/api v0.30.3
 	k8s.io/apimachinery v0.30.3
@@ -38,7 +40,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.3.0 // indirect

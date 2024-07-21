@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 )
 
 const (
@@ -43,9 +44,9 @@ type LeaseAttrs struct {
 
 // Lease includes information about the lease
 type Lease struct {
-	EnableIPv4 bool
-	EnableIPv6 bool
-	Attrs      LeaseAttrs
+	CidrIPv4 []*net.IPNet
+	CidrIPv6 []*net.IPNet
+	Attrs    LeaseAttrs
 }
 
 func (la *LeaseAttrs) String() string {

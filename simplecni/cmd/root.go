@@ -127,6 +127,8 @@ func run() error {
 	wg.Add(1)
 	go func() {
 		backend.Run(ctx)
+		cancel()
+		log.Infof("backend done")
 		wg.Done()
 	}()
 

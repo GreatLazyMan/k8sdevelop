@@ -18,8 +18,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,7 +39,11 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	log "k8s.io/klog/v2"
+
+	"github.com/GreatLazyMan/simplecni/pkg/constants"
+	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
 )
 
 var (
@@ -69,7 +75,7 @@ type kubeSubnetManager struct {
 	snFileInfo                *subnetFileInfo
 }
 
-func NewSubnetManager(ctx context.Context, kubeconfig, prefix string) (*kubeSubnetManager, error) {
+func NewSubnetManager(ctx context.Context, kubeconfig string) (*kubeSubnetManager, error) {
 	var cfg *rest.Config
 	var err error
 	// Try to build kubernetes config from a master url or a kubeconfig filepath. If neither masterUrl
@@ -106,7 +112,7 @@ func NewSubnetManager(ctx context.Context, kubeconfig, prefix string) (*kubeSubn
 		}
 	}
 
-	sm, err := newKubeSubnetManager(ctx, c, nodeName, prefix)
+	sm, err := newKubeSubnetManager(ctx, c, nodeName)
 	if err != nil {
 		log.Errorf("error creating network manager: %s", err)
 		return nil, fmt.Errorf("error creating network manager: %s", err)
@@ -128,10 +134,10 @@ func NewSubnetManager(ctx context.Context, kubeconfig, prefix string) (*kubeSubn
 
 // newKubeSubnetManager fills the kubeSubnetManager. The most important part is the controller which will
 // watch for kubernetes node updates
-func newKubeSubnetManager(ctx context.Context, c clientset.Interface, nodeName, prefix string) (*kubeSubnetManager, error) {
+func newKubeSubnetManager(ctx context.Context, c clientset.Interface, nodeName string) (*kubeSubnetManager, error) {
 	var err error
 	var ksm kubeSubnetManager
-	ksm.annotations, err = newAnnotations(prefix)
+	ksm.annotations, err = newAnnotations(constants.Prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +201,9 @@ func newKubeSubnetManager(ctx context.Context, c clientset.Interface, nodeName, 
 func (ksm *kubeSubnetManager) handleAddLeaseEvent(et EventType, obj interface{}) {
 	n := obj.(*v1.Node)
 
+	if ksm.nodeName == n.Name {
+		return
+	}
 	l, err := ksm.nodeToLease(*n)
 	if err != nil {
 		log.Infof("Error turning node %q to lease: %v", n.ObjectMeta.Name, err)
@@ -208,7 +217,10 @@ func (ksm *kubeSubnetManager) handleAddLeaseEvent(et EventType, obj interface{})
 func (ksm *kubeSubnetManager) handleUpdateLeaseEvent(oldObj, newObj interface{}) {
 	o := oldObj.(*v1.Node)
 	n := newObj.(*v1.Node)
-	if apiequality.Semantic.DeepEqual(o, n) {
+	if ksm.nodeName == n.Name {
+		return
+	}
+	if apiequality.Semantic.DeepEqual(o.Spec.PodCIDRs, n.Spec.PodCIDRs) {
 		return
 	}
 
@@ -223,9 +235,8 @@ func (ksm *kubeSubnetManager) handleUpdateLeaseEvent(oldObj, newObj interface{})
 // AcquireLease adds the flannel specific node annotations (defined in the struct LeaseAttrs) and returns a lease
 // with important information for the backend, such as the subnet. This function is called once by the backend when
 // registering
-func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *LeaseAttrs) (*Lease, error) {
+func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs map[string]string) (*Lease, error) {
 	var cachedNode *v1.Node
-	var err error
 	waitErr := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
 		cachedNode, err = ksm.nodeStore.Get(ksm.nodeName)
 		if err != nil {
@@ -243,15 +254,17 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *LeaseAttr
 		return nil, fmt.Errorf("node %q pod cidr not assigned", ksm.nodeName)
 	}
 
-	var bd []byte
-	bd, err = attrs.BackendData.MarshalJSON()
-	if err != nil {
-		return nil, err
+	changed := false
+
+	for k, v := range attrs {
+		annotationsKey := fmt.Sprintf("%s%s", constants.Prefix, k)
+		annotationsKey = strings.ToLower(annotationsKey)
+		if n.Annotations != nil && n.Annotations[annotationsKey] != v {
+			changed = true
+			n.Annotations[annotationsKey] = v
+		}
 	}
-
-	if n.Annotations[ksm.annotations.BackendData] != string(bd) {
-		n.Annotations[ksm.annotations.SubnetKubeManaged] = "true"
-
+	if changed {
 		oldData, err := json.Marshal(cachedNode)
 		if err != nil {
 			return nil, err
@@ -275,15 +288,24 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *LeaseAttr
 			}
 			return true, nil
 		})
+		klog.Info("patch node annotations")
 		if waitErr != nil {
 			return nil, fmt.Errorf("timeout contacting kube-api, failed to patch node %q. Error: %v", ksm.nodeName, waitErr)
 		}
 	}
 
-	lease := &Lease{
-		Attrs: *attrs,
+	var CidrIPv4 []*net.IPNet
+	var CidrIPv6 []*net.IPNet
+	for _, podcidr := range n.Spec.PodCIDRs {
+		_, netcidr, _ := net.ParseCIDR(podcidr)
+		if netcidr.IP.To4() != nil {
+			CidrIPv4 = append(CidrIPv4, netcidr)
+		} else {
+			CidrIPv6 = append(CidrIPv6, netcidr)
+		}
 	}
-	return lease, nil
+
+	return &Lease{CidrIPv4: CidrIPv4, CidrIPv6: CidrIPv6}, nil
 }
 
 // WatchLeases waits for the kubeSubnetManager to provide an event in case something relevant changed in the node data
@@ -293,7 +315,7 @@ func (ksm *kubeSubnetManager) WatchLeases(ctx context.Context, receiver chan Eve
 		case event := <-ksm.events:
 			receiver <- event
 		case <-ctx.Done():
-			close(receiver)
+			return
 		}
 	}
 }
@@ -307,9 +329,19 @@ func (ksm *kubeSubnetManager) Run(ctx context.Context) {
 func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l Lease, err error) {
 	if ksm.enableIPv4 {
 		l.Attrs.BackendData = json.RawMessage(n.Annotations[ksm.annotations.BackendData])
-		l.EnableIPv4 = ksm.enableIPv4
 	}
 
+	for _, podCidr := range n.Spec.PodCIDRs {
+		ip, cidr, err := net.ParseCIDR(podCidr)
+		if err != nil {
+			klog.Errorf("pod cidr %s parse err: %v", podCidr, err)
+		}
+		if ip.To4() == nil {
+			l.CidrIPv4 = append(l.CidrIPv4, cidr)
+		} else {
+			l.CidrIPv6 = append(l.CidrIPv6, cidr)
+		}
+	}
 	l.Attrs.BackendType = n.Annotations[ksm.annotations.BackendType]
 	return l, nil
 }
@@ -342,11 +374,6 @@ func (ksm *kubeSubnetManager) CompleteLease(ctx context.Context, lease *Lease, w
 // HandleSubnetFile writes the configuration file used by the CNI flannel plugin
 // and stores the immutable data in a dedicated struct of the subnet manager
 // so that we can update the file later when a clustercidr resource is created.
-//func (m *kubeSubnetManager) HandleSubnetFile(path string, config *subnet.Config, ipMasq bool, sn ip.IP4Net, ipv6sn ip.IP6Net, mtu int) error {
-//	m.snFileInfo = &subnetFileInfo{
-//		path:   path,
-//		ipMask: ipMasq,
-//		mtu:    mtu,
-//	}
-//	return subnet.WriteSubnetFile(path, config, ipMasq, sn, ipv6sn, mtu)
-//}
+func (m *kubeSubnetManager) HandleSubnetFile(subnetMap map[string]string) error {
+	return files.WriteSubnetFile(subnetMap)
+}

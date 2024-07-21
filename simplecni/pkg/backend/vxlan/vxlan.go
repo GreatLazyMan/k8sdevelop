@@ -4,28 +4,79 @@ import (
 	"context"
 
 	"github.com/GreatLazyMan/simplecni/pkg/nodemanager"
+	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
+	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
 	"k8s.io/klog/v2"
 )
 
-const BackendType string = "vxlan"
+const (
+	BackendType = "vxlan"
+	MTU         = "1450"
+	MTUint      = 1450
+	DevieName   = "simplevxlan"
+)
 
 type VxlanBackend struct {
 	KubeConfig string
+	Configmap  map[string]string
 }
 
+func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string {
+	subnetMap := make(map[string]string)
+	subnetMap["MTU"] = MTU
+	if len(lease.CidrIPv4) > 0 {
+		subnetMap["SUBNET"] = lease.CidrIPv4[0].String()
+	}
+	if len(lease.CidrIPv6) > 0 {
+		subnetMap["IPV6_SUBNET"] = lease.CidrIPv6[0].String()
+	}
+	return subnetMap
+}
 func (v *VxlanBackend) Run(ctx context.Context) {
-	nodeManager, err := nodemanager.NewSubnetManager(ctx, v.KubeConfig, "simplecni.io/simplecni")
+	nodeManager, err := nodemanager.NewSubnetManager(ctx, v.KubeConfig)
 	if err != nil {
 		klog.Errorf("node controller started error: %v", err)
+		return
 	}
+
+	// get node info
 	leaseWatchChan := make(chan nodemanager.Event)
+	lease, err := nodeManager.AcquireLease(ctx, v.Configmap)
+	if err != nil {
+		klog.Errorf("acquire node info error: %v", err)
+		return
+	}
+
+	// write subnet file info
+	subnetMap := v.GetSubnetMap(lease)
+	err = files.WriteSubnetFile(subnetMap)
+	if err != nil {
+		klog.Errorf("write subnetfile error: %v", err)
+		return
+	}
+
+	// init vxlan devie
+	vAttr := network.VxlanDeviceAttrs{
+		MTU:  MTUint,
+		Name: DevieName,
+	}
+	_, err = network.NewVXLANDevice(&vAttr)
+	if err != nil {
+		klog.Errorf("init vxlan device error: %v", err)
+		return
+	}
+
+	// start watch node
 	go nodeManager.WatchLeases(ctx, leaseWatchChan)
-	klog.Info("WatchLeases")
+	klog.Info("Start Watching Leases")
+
+	// handle node object key
 	for {
 		select {
 		case event := <-leaseWatchChan:
 			klog.Infof("event is %v", event)
 		case <-ctx.Done():
+			close(leaseWatchChan)
 			return
 		}
 	}

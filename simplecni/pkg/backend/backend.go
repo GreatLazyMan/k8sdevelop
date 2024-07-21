@@ -19,20 +19,19 @@ func NewNetworkBackend(opts *options.CmdLineOpts) NetworkBackend {
 	netConf, err := os.ReadFile(opts.ConfigPath)
 	if err != nil {
 		klog.Errorf("failed to read net conf: %v", err)
-		backendType = vxlan.BackendType
-	} else {
-		sc, err := netconfig.ParseConfig(string(netConf))
-		if err != nil {
-			klog.Errorf("error parsing subnet config: %s", err)
-			return nil
-		}
-		backendType = sc.BackendType
+		return nil
 	}
+	sc, err := netconfig.ParseConfig(string(netConf))
+	if err != nil {
+		klog.Errorf("error parsing subnet config: %s", err)
+		return nil
+	}
+	backendType = sc.BackendType
 
 	switch backendType {
 	case vxlan.BackendType:
-		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig}
+		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Configmap: sc.Configmap}
 	default:
-		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig}
+		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Configmap: sc.Configmap}
 	}
 }
