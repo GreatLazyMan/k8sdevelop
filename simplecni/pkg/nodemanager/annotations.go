@@ -51,7 +51,7 @@ func newAnnotations(prefix string) (annotations, error) {
 	//	- must start with FQDN - must contain at most one slash "/"
 	//	- must contain only lowercase letters, nubers, underscores,
 	//	  hyphens, dots and slash
-	matches, err := regexp.MatchString(`(?:[a-z0-9_-]+\.)+[a-z0-9_-]+/(?:[a-z0-9_-]+-)?$`, prefix)
+	matches, err := regexp.MatchString(`(?:[a-z0-9-]+\.)+[a-z0-9-]+/(?:[a-z0-9_-]+-)?$`, prefix)
 	if err != nil {
 		panic(err)
 	}

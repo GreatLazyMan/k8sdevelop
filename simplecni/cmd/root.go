@@ -6,23 +6,18 @@ package cmd
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
+	"github.com/GreatLazyMan/simplecni/cmd/options"
 	"github.com/GreatLazyMan/simplecni/pkg/backend"
-	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
+
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/spf13/cobra"
 	log "k8s.io/klog/v2"
 )
-
-type CmdLineOpts struct {
-	IpMasq     bool
-	ConfigPath string
-}
 
 type NetworkBackend struct {
 	Type string
@@ -46,7 +41,7 @@ to quickly create a Cobra application.`,
 }
 
 var (
-	opts CmdLineOpts
+	opts options.CmdLineOpts
 )
 
 func copypflag(dstFlagSet *flag.FlagSet, srcFlagSet *flag.FlagSet, name string) {
@@ -57,6 +52,8 @@ func init() {
 	cniFlags := rootCmd.Flags()
 	cniFlags.BoolVar(&opts.IpMasq, "ip-masq", true, "setup IP masquerade rule for traffic destined outside of overlay network")
 	cniFlags.StringVar(&opts.ConfigPath, "configpath", "/etc/simplecni/net-conf.json", "the config json path")
+	cniFlags.StringVar(&opts.KubeConfig, "kubeconfig", "/root/.kube/config", "kubernetes's kubeconfig")
+
 	// add klog pflag into commandline pflag
 	log.InitFlags(nil)
 	klogFlagSet := flag.NewFlagSet("klog", flag.ExitOnError)
@@ -107,19 +104,11 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// do some init work
 	// Register for SIGINT and SIGTERM
 	log.Info("Installing signal handlers")
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-
-	netConf, err := os.ReadFile(opts.ConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to read net conf: %v", err)
-	}
-	sc, err := netconfig.ParseConfig(string(netConf))
-	if err != nil {
-		return fmt.Errorf("error parsing subnet config: %s", err)
-	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -128,7 +117,12 @@ func run() error {
 		wg.Done()
 	}()
 
-	backend := backend.NewNetworkBackend(sc)
+	// do some real work
+	backend := backend.NewNetworkBackend(&opts)
+	if backend == nil {
+		log.Error("backend can't be inited, please check your config")
+		os.Exit(1)
+	}
 	log.Info("Running backend.")
 	wg.Add(1)
 	go func() {
@@ -136,13 +130,16 @@ func run() error {
 		wg.Done()
 	}()
 
-	_, err = daemon.SdNotify(false, "READY=1")
+	// notify ready
+	_, err := daemon.SdNotify(false, "READY=1")
 	if err != nil {
 		log.Errorf("Failed to notify systemd the message READY=1 %v", err)
 	}
 	log.Info("Waiting for all goroutines to exit")
-	// Block waiting for all the goroutines to finish.
 	wg.Wait()
+
+	// do some clear work
+	// Block waiting for all the goroutines to finish.
 	log.Info("Exiting cleanly...")
 	os.Exit(0)
 

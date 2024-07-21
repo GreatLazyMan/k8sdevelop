@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +59,6 @@ type kubeSubnetManager struct {
 	enableIPv4                bool
 	enableIPv6                bool
 	annotations               annotations
-	annotationPrefix          string
 	client                    clientset.Interface
 	nodeName                  string
 	nodeStore                 listers.NodeLister
@@ -70,13 +69,13 @@ type kubeSubnetManager struct {
 	snFileInfo                *subnetFileInfo
 }
 
-func NewSubnetManager(ctx context.Context, apiUrl, kubeconfig, prefix, netConfPath string) (*kubeSubnetManager, error) {
+func NewSubnetManager(ctx context.Context, kubeconfig, prefix string) (*kubeSubnetManager, error) {
 	var cfg *rest.Config
 	var err error
 	// Try to build kubernetes config from a master url or a kubeconfig filepath. If neither masterUrl
 	// or kubeconfigPath are passed in we fall back to inClusterConfig. If inClusterConfig fails,
 	// we fallback to the default config.
-	cfg, err = clientcmd.BuildConfigFromFlags(apiUrl, kubeconfig)
+	cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create kubernetes config: %v", err)
 	}
@@ -109,6 +108,7 @@ func NewSubnetManager(ctx context.Context, apiUrl, kubeconfig, prefix, netConfPa
 
 	sm, err := newKubeSubnetManager(ctx, c, nodeName, prefix)
 	if err != nil {
+		log.Errorf("error creating network manager: %s", err)
 		return nil, fmt.Errorf("error creating network manager: %s", err)
 	}
 
@@ -131,7 +131,6 @@ func NewSubnetManager(ctx context.Context, apiUrl, kubeconfig, prefix, netConfPa
 func newKubeSubnetManager(ctx context.Context, c clientset.Interface, nodeName, prefix string) (*kubeSubnetManager, error) {
 	var err error
 	var ksm kubeSubnetManager
-	ksm.annotationPrefix = prefix
 	ksm.annotations, err = newAnnotations(prefix)
 	if err != nil {
 		return nil, err
@@ -195,9 +194,6 @@ func newKubeSubnetManager(ctx context.Context, c clientset.Interface, nodeName, 
 
 func (ksm *kubeSubnetManager) handleAddLeaseEvent(et EventType, obj interface{}) {
 	n := obj.(*v1.Node)
-	if s, ok := n.Annotations[ksm.annotations.SubnetKubeManaged]; !ok || s != "true" {
-		return
-	}
 
 	l, err := ksm.nodeToLease(*n)
 	if err != nil {
@@ -212,18 +208,8 @@ func (ksm *kubeSubnetManager) handleAddLeaseEvent(et EventType, obj interface{})
 func (ksm *kubeSubnetManager) handleUpdateLeaseEvent(oldObj, newObj interface{}) {
 	o := oldObj.(*v1.Node)
 	n := newObj.(*v1.Node)
-	if s, ok := n.Annotations[ksm.annotations.SubnetKubeManaged]; !ok || s != "true" {
+	if apiequality.Semantic.DeepEqual(o, n) {
 		return
-	}
-	var changed = true
-	if ksm.enableIPv4 && o.Annotations[ksm.annotations.BackendData] == n.Annotations[ksm.annotations.BackendData] &&
-		o.Annotations[ksm.annotations.BackendType] == n.Annotations[ksm.annotations.BackendType] &&
-		o.Annotations[ksm.annotations.BackendPublicIP] == n.Annotations[ksm.annotations.BackendPublicIP] {
-		changed = false
-	}
-
-	if !changed {
-		return // No change to lease
 	}
 
 	l, err := ksm.nodeToLease(*n)
@@ -295,24 +281,19 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *LeaseAttr
 	}
 
 	lease := &Lease{
-		Attrs:      *attrs,
-		Expiration: time.Now().Add(24 * time.Hour),
+		Attrs: *attrs,
 	}
 	return lease, nil
 }
 
 // WatchLeases waits for the kubeSubnetManager to provide an event in case something relevant changed in the node data
-func (ksm *kubeSubnetManager) WatchLeases(ctx context.Context, receiver chan []LeaseWatchResult) error {
+func (ksm *kubeSubnetManager) WatchLeases(ctx context.Context, receiver chan Event) {
 	for {
 		select {
 		case event := <-ksm.events:
-			receiver <- []LeaseWatchResult{
-				{
-					Events: []Event{event},
-				}}
+			receiver <- event
 		case <-ctx.Done():
 			close(receiver)
-			return ctx.Err()
 		}
 	}
 }
@@ -369,39 +350,3 @@ func (ksm *kubeSubnetManager) CompleteLease(ctx context.Context, lease *Lease, w
 //	}
 //	return subnet.WriteSubnetFile(path, config, ipMasq, sn, ipv6sn, mtu)
 //}
-
-// GetStoredMacAddresses reads MAC addresses from node annotations when flannel restarts
-func (ksm *kubeSubnetManager) GetStoredMacAddresses(ctx context.Context) (string, string) {
-	var macv4, macv6 string
-	// get mac info from Name func.
-	node, err := ksm.client.CoreV1().Nodes().Get(ctx, ksm.nodeName, metav1.GetOptions{})
-	if err != nil {
-		log.Errorf("Failed to get node for backend data: %v", err)
-		return "", ""
-	}
-
-	// node backend data format: `{"VNI":1,"VtepMAC":"12:c6:65:89:b4:e3"}`
-	// and we will return only mac addr str like 12:c6:65:89:b4:e3
-	if node != nil && node.Annotations != nil {
-		log.Infof("List of node(%s) annotations: %#+v", ksm.nodeName, node.Annotations)
-		backendData, ok := node.Annotations[fmt.Sprintf("%s/backend-data", ksm.annotationPrefix)]
-		if ok {
-			macStr := strings.Trim(backendData, "\"}")
-			macInfoSlice := strings.Split(macStr, ":\"")
-			if len(macInfoSlice) == 2 {
-				macv4 = macInfoSlice[1]
-			}
-		}
-		backendDatav6, okv6 := node.Annotations[fmt.Sprintf("%s/backend-v6-data", ksm.annotationPrefix)]
-		if okv6 {
-			macStr := strings.Trim(backendDatav6, "\"}")
-			macInfoSlice := strings.Split(macStr, ":\"")
-			if len(macInfoSlice) == 2 {
-				macv6 = macInfoSlice[1]
-			}
-		}
-		return macv4, macv6
-	}
-
-	return "", ""
-}
