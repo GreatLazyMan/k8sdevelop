@@ -52,7 +52,7 @@ func init() {
 	cniFlags := rootCmd.Flags()
 	cniFlags.BoolVar(&opts.IpMasq, "ip-masq", true, "setup IP masquerade rule for traffic destined outside of overlay network")
 	cniFlags.StringVar(&opts.ConfigPath, "configpath", "/etc/simplecni/net-conf.json", "the config json path")
-	cniFlags.StringVar(&opts.KubeConfig, "kubeconfig", "/root/.kube/config", "kubernetes's kubeconfig")
+	cniFlags.StringVar(&opts.KubeConfig, "kubeconfig", "", "kubernetes's kubeconfig")
 
 	// add klog pflag into commandline pflag
 	log.InitFlags(nil)

@@ -1,12 +1,17 @@
+set -eux
 CURRENT_DIR=$(dirname $0)
-pushd ${CURRENT_DIR}/../
-go build .
-popd
 
 pushd ${CURRENT_DIR}/../cniplugin/
 go build 
+mv cniplugin ../deploy/
 popd
-sudo docker build . -f ${CURRENT_DIR}/../deploy/Dockerfile -t simplecni:v0.0.1
+tar zcf /tmp/simplecni.tar.gz ${CURRENT_DIR}/../../simplecni 
+tar zxf /tmp/simplecni.tar.gz -C ${CURRENT_DIR}/../deploy/
+pushd ${CURRENT_DIR}/../deploy/
+sudo docker build . -t simplecni:v0.0.1
+rm -rf simplecni
+rm -f cniplugin
+popd
 
-rm -f ${CURRENT_DIR}/../cniplugin/cniplugin
-rm -f  ${CURRENT_DIR}/../simplecni
+sudo docker save simplecni:v0.0.1 -o /tmp/simplecni.tar
+sudo ctr -n k8s.io i import /tmp/simplecni.tar
