@@ -2,7 +2,9 @@ package vxlan
 
 import (
 	"context"
+	"net"
 
+	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
 	"github.com/GreatLazyMan/simplecni/pkg/nodemanager"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
@@ -18,7 +20,7 @@ const (
 
 type VxlanBackend struct {
 	KubeConfig string
-	Configmap  map[string]string
+	Config     *netconfig.Config
 }
 
 func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string {
@@ -33,6 +35,7 @@ func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string 
 	return subnetMap
 }
 func (v *VxlanBackend) Run(ctx context.Context) {
+	klog.Info("vxlan backend run")
 	nodeManager, err := nodemanager.NewSubnetManager(ctx, v.KubeConfig)
 	if err != nil {
 		klog.Errorf("node controller started error: %v", err)
@@ -41,7 +44,7 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 
 	// get node info
 	leaseWatchChan := make(chan nodemanager.Event)
-	lease, err := nodeManager.AcquireLease(ctx, v.Configmap)
+	lease, err := nodeManager.AcquireLease(ctx, v.Config.Configmap)
 	if err != nil {
 		klog.Errorf("acquire node info error: %v", err)
 		return
@@ -57,12 +60,22 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 
 	// init vxlan devie
 	vAttr := network.VxlanDeviceAttrs{
-		MTU:  MTUint,
-		Name: DevieName,
+		Name:      DevieName,
+		Vni:       10086,
+		VtepIndex: v.Config.Netlink.Attrs().Index,
+		VtepAddr:  net.ParseIP(v.Config.Configmap[netconfig.IPAddr]).To4(),
+		MTU:       v.Config.Netlink.Attrs().MTU,
 	}
-	_, err = network.NewVXLANDevice(&vAttr)
+
+	vlanxDevice, err := network.NewVXLANDevice(&vAttr)
 	if err != nil {
 		klog.Errorf("init vxlan device error: %v", err)
+		return
+	}
+
+	err = vlanxDevice.Configure(lease.CidrIPv4[0], lease.CidrIPv4[0])
+	if err != nil {
+		klog.Errorf("configure vxlan device error: %v", err)
 		return
 	}
 

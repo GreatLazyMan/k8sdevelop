@@ -34,8 +34,6 @@ type VxlanDeviceAttrs struct {
 	VtepIndex int
 	VtepAddr  net.IP
 	VtepPort  int
-	Gbp       bool
-	Learning  bool
 	HwAddr    net.HardwareAddr
 }
 
@@ -64,9 +62,9 @@ func NewVXLANDevice(devAttrs *VxlanDeviceAttrs) (*VxlanDevice, error) {
 		VtepDevIndex: devAttrs.VtepIndex,
 		SrcAddr:      devAttrs.VtepAddr,
 		Port:         devAttrs.VtepPort,
-		Learning:     devAttrs.Learning,
-		GBP:          devAttrs.Gbp,
+		Learning:     false,
 	}
+	log.Info("starting to create vxlan device")
 
 	link, err = ensureLink(link)
 	if err != nil {
@@ -120,6 +118,7 @@ func ensureLink(vxlan *netlink.Vxlan) (*netlink.Vxlan, error) {
 	if vxlan, ok = link.(*netlink.Vxlan); !ok {
 		return nil, fmt.Errorf("created vxlan device with index %v is not vxlan", ifindex)
 	}
+	log.Info("created vxlan device")
 
 	return vxlan, nil
 }

@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
+	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
 )
 
@@ -14,6 +15,8 @@ type Config struct {
 	BackendType string            `json:"-"`
 	Configmap   map[string]string `json:"-"`
 	Backend     json.RawMessage   `json:",omitempty"`
+	IfaceName   string            `json:"-"`
+	Netlink     netlink.Link      `json:"-"`
 }
 
 const (
@@ -21,7 +24,8 @@ const (
 	IPAddrV6 = "IPAddrV6"
 )
 
-func setInterfaceAddressByName(ifaceName string, ifaceNameList []string, ifaceNameRegex string, configmap map[string]string) error {
+func setInterfaceAddressByName(ifaceName string, ifaceNameList []string, ifaceNameRegex string, cfg *Config) error {
+	configmap := make(map[string]string)
 	// acquire addr by iface name
 	ifaceList := make([]*net.Interface, 0)
 	if len(ifaceName) == 0 && len(ifaceNameList) == 0 && len(ifaceNameRegex) == 0 {
@@ -61,12 +65,21 @@ func setInterfaceAddressByName(ifaceName string, ifaceNameList []string, ifaceNa
 		}
 	}
 	for _, iface := range ifaceList {
+		// get ipv4 addr
 		ipaddr, err := network.GetInterfaceIP4Addrs(iface)
 		if err != nil {
 			klog.Errorf("get ipv4 addr from  %s error: %v", iface.Name, err)
 			continue
 		}
 		configmap[IPAddr] = ipaddr[0].String()
+		//set link
+		link, err := netlink.LinkByName(iface.Name)
+		if err != nil {
+			return fmt.Errorf("get netlink by name %s error: %v", iface.Name, err)
+		}
+		cfg.Netlink = link
+
+		// get ipv6 addr
 		ipaddr, err = network.GetInterfaceIP6Addrs(iface)
 		if err != nil && !errors.Is(err, network.NotFoundIP) {
 			return fmt.Errorf("get ipv6 addr error: %v", err)
@@ -75,32 +88,33 @@ func setInterfaceAddressByName(ifaceName string, ifaceNameList []string, ifaceNa
 			configmap[IPAddrV6] = ipaddr[0].String()
 		}
 	}
+	cfg.Configmap = configmap
 	if _, ok := configmap[IPAddr]; !ok {
 		return fmt.Errorf("get address from iface error from %v", ifaceList)
 	}
 	return nil
 }
 
-func parseBackendType(be json.RawMessage) (string, map[string]string, error) {
+func parseBackendType(cfg *Config) error {
 	var bt struct {
 		Type       string
 		Iface      string
 		IfaceList  []string
 		IfaceMatch string
 	}
-	cm := make(map[string]string)
+	be := cfg.Backend
 	if err := json.Unmarshal(be, &bt); err != nil {
-		return "", nil, fmt.Errorf("error decoding Backend property of config: %v", err)
+		return fmt.Errorf("error decoding Backend property of config: %v", err)
 	}
+	cfg.BackendType = bt.Type
 
 	klog.Infof("get json: %v", bt)
-	err := setInterfaceAddressByName(bt.Iface, bt.IfaceList, bt.IfaceMatch, cm)
+	err := setInterfaceAddressByName(bt.Iface, bt.IfaceList, bt.IfaceMatch, cfg)
 	if err != nil {
-		return "", nil, fmt.Errorf("get ip address error: %v", err)
+		return fmt.Errorf("get ip address error: %v", err)
 	}
 
-	klog.Infof("get backend type %s, configmap %v", bt.Type, cm)
-	return bt.Type, cm, nil
+	return nil
 }
 
 func ParseConfig(s string) (*Config, error) {
@@ -110,12 +124,10 @@ func ParseConfig(s string) (*Config, error) {
 		return nil, err
 	}
 
-	bt, cm, err := parseBackendType(cfg.Backend)
+	err = parseBackendType(cfg)
 	if err != nil {
 		return nil, err
 	}
-	cfg.BackendType = bt
-	cfg.Configmap = cm
 
 	return cfg, nil
 }

@@ -30,8 +30,8 @@ func NewNetworkBackend(opts *options.CmdLineOpts) NetworkBackend {
 
 	switch backendType {
 	case vxlan.BackendType:
-		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Configmap: sc.Configmap}
+		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Config: sc}
 	default:
-		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Configmap: sc.Configmap}
+		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Config: sc}
 	}
 }
