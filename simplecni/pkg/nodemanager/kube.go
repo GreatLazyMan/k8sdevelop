@@ -64,7 +64,6 @@ type subnetFileInfo struct {
 type kubeSubnetManager struct {
 	enableIPv4                bool
 	enableIPv6                bool
-	annotations               annotations
 	client                    clientset.Interface
 	nodeName                  string
 	nodeStore                 listers.NodeLister
@@ -135,12 +134,7 @@ func NewSubnetManager(ctx context.Context, kubeconfig string) (*kubeSubnetManage
 // newKubeSubnetManager fills the kubeSubnetManager. The most important part is the controller which will
 // watch for kubernetes node updates
 func newKubeSubnetManager(ctx context.Context, c clientset.Interface, nodeName string) (*kubeSubnetManager, error) {
-	var err error
 	var ksm kubeSubnetManager
-	ksm.annotations, err = newAnnotations(constants.Prefix)
-	if err != nil {
-		return nil, err
-	}
 	ksm.client = c
 	ksm.nodeName = nodeName
 	scale := 5000
@@ -327,9 +321,6 @@ func (ksm *kubeSubnetManager) Run(ctx context.Context) {
 
 // nodeToLease updates the lease with information fetch from the node, e.g. PodCIDR
 func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l Lease, err error) {
-	if ksm.enableIPv4 {
-		l.Attrs.BackendData = json.RawMessage(n.Annotations[ksm.annotations.BackendData])
-	}
 
 	for _, podCidr := range n.Spec.PodCIDRs {
 		ip, cidr, err := net.ParseCIDR(podCidr)
@@ -342,7 +333,6 @@ func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l Lease, err error) {
 			l.CidrIPv6 = append(l.CidrIPv6, cidr)
 		}
 	}
-	l.Attrs.BackendType = n.Annotations[ksm.annotations.BackendType]
 	return l, nil
 }
 

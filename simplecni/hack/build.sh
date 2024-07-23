@@ -1,3 +1,4 @@
+#!/bin/bash
 set -eux
 CURRENT_DIR=$(dirname $0)
 

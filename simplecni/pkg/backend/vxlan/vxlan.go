@@ -8,6 +8,7 @@ import (
 	"github.com/GreatLazyMan/simplecni/pkg/nodemanager"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
+	"github.com/cloudflare/cfssl/log"
 	"k8s.io/klog/v2"
 )
 
@@ -21,6 +22,21 @@ const (
 type VxlanBackend struct {
 	KubeConfig string
 	Config     *netconfig.Config
+}
+
+func (v *VxlanBackend) ConfigureRoute(event nodemanager.Event) {
+
+	switch event.Type {
+	case nodemanager.EventAdded:
+		log.Infof("Subnet added: %v", event.Lease.CidrIPv4[0])
+		//routeAdd(route, netlink.FAMILY_V4, n.addToRouteList, n.removeFromV4RouteList)
+	case nodemanager.EventRemoved:
+		log.Infof("Subnet del: %v", event.Lease.CidrIPv4[0])
+		//n.removeFromV4RouteList(*route)
+	default:
+		log.Error("Internal error: unknown event type: ", int(event.Type))
+	}
+
 }
 
 func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string {
@@ -90,6 +106,7 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		select {
 		case event := <-leaseWatchChan:
 			klog.Infof("event is %v", event)
+			v.ConfigureRoute(event)
 		case <-ctx.Done():
 			close(leaseWatchChan)
 			return
