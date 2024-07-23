@@ -73,7 +73,9 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		return
 	}
 
-	err = vlanxDevice.Configure(lease.CidrIPv4[0], lease.CidrIPv4[0])
+	vxlanAddr := lease.CidrIPv4[0]
+	vxlanAddr.Mask = network.Localhost.Mask
+	err = vlanxDevice.Configure(vxlanAddr, lease.CidrIPv4[0])
 	if err != nil {
 		klog.Errorf("configure vxlan device error: %v", err)
 		return

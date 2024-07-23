@@ -65,7 +65,7 @@ type subnetEnv struct {
 	ip6Nws []*net.IPNet
 	ip6Sn  *net.IPNet
 	mtu    *uint
-	ipmasq *bool
+	ipmasq bool
 }
 
 func init() {
@@ -83,18 +83,18 @@ func init() {
 func (se *subnetEnv) missing() string {
 	m := []string{}
 
-	if len(se.nws) == 0 && len(se.ip6Nws) == 0 {
-		m = append(m, []string{"NETWORK", "IPV6_NETWORK"}...)
-	}
+	//if len(se.nws) == 0 && len(se.ip6Nws) == 0 {
+	//	m = append(m, []string{"NETWORK", "IPV6_NETWORK"}...)
+	//}
 	if se.sn == nil && se.ip6Sn == nil {
 		m = append(m, []string{"SUBNET", "IPV6_SUBNET"}...)
 	}
 	if se.mtu == nil {
 		m = append(m, "MTU")
 	}
-	if se.ipmasq == nil {
-		m = append(m, "IPMASQ")
-	}
+	//if se.ipmasq == nil {
+	//	m = append(m, "IPMASQ")
+	//}
 	return strings.Join(m, ", ")
 }
 
@@ -199,7 +199,7 @@ func loadSubnetEnv(fn string) (*subnetEnv, error) {
 
 		case "IPMASQ":
 			ipmasq := parts[1] == "true"
-			se.ipmasq = &ipmasq
+			se.ipmasq = ipmasq
 		}
 	}
 	if err := s.Err(); err != nil {
