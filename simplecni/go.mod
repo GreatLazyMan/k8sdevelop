@@ -3,6 +3,7 @@ module github.com/GreatLazyMan/simplecni
 go 1.22.1
 
 require (
+	github.com/avast/retry-go/v4 v4.6.0
 	github.com/containernetworking/cni v1.2.2
 	github.com/containernetworking/plugins v1.5.1
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf

@@ -22,9 +22,12 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	log "k8s.io/klog/v2"
+
+	"github.com/GreatLazyMan/simplecni/pkg/utils/util"
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 )
 
 type VxlanDeviceAttrs struct {
@@ -38,8 +41,7 @@ type VxlanDeviceAttrs struct {
 }
 
 type VxlanDevice struct {
-	link          *netlink.Vxlan
-	directRouting bool
+	Link *netlink.Vxlan
 }
 
 func NewVXLANDevice(devAttrs *VxlanDeviceAttrs) (*VxlanDevice, error) {
@@ -74,7 +76,7 @@ func NewVXLANDevice(devAttrs *VxlanDeviceAttrs) (*VxlanDevice, error) {
 	_, _ = sysctl.Sysctl(fmt.Sprintf("net/ipv6/conf/%s/accept_ra", devAttrs.Name), "0")
 
 	return &VxlanDevice{
-		link: link,
+		Link: link,
 	}, nil
 }
 
@@ -124,21 +126,21 @@ func ensureLink(vxlan *netlink.Vxlan) (*netlink.Vxlan, error) {
 }
 
 func (dev *VxlanDevice) Configure(ipa, ipn *net.IPNet) error {
-	if err := EnsureV4AddressOnLink(ipa, ipn, dev.link); err != nil {
-		return fmt.Errorf("failed to ensure address of interface %s: %s", dev.link.Attrs().Name, err)
+	if err := EnsureV4AddressOnLink(ipa, ipn, dev.Link); err != nil {
+		return fmt.Errorf("failed to ensure address of interface %s: %s", dev.Link.Attrs().Name, err)
 	}
 
-	if err := netlink.LinkSetUp(dev.link); err != nil {
-		return fmt.Errorf("failed to set interface %s to UP state: %s", dev.link.Attrs().Name, err)
+	if err := netlink.LinkSetUp(dev.Link); err != nil {
+		return fmt.Errorf("failed to set interface %s to UP state: %s", dev.Link.Attrs().Name, err)
 	}
 
 	// ensure vxlan device hadware mac
 	// See https://github.com/flannel-io/flannel/issues/1795
-	nLink, err := netlink.LinkByName(dev.link.LinkAttrs.Name)
+	nLink, err := netlink.LinkByName(dev.Link.LinkAttrs.Name)
 	if err == nil {
 		if vxlan, ok := nLink.(*netlink.Vxlan); ok {
 			if vxlan.Attrs().HardwareAddr.String() != dev.MACAddr().String() {
-				return fmt.Errorf("%s's mac address wanted: %s, but got: %v", dev.link.Name, dev.MACAddr().String(), vxlan.HardwareAddr)
+				return fmt.Errorf("%s's mac address wanted: %s, but got: %v", dev.Link.Name, dev.MACAddr().String(), vxlan.HardwareAddr)
 			}
 		}
 	}
@@ -147,21 +149,21 @@ func (dev *VxlanDevice) Configure(ipa, ipn *net.IPNet) error {
 }
 
 func (dev *VxlanDevice) ConfigureIPv6(ipa, ipn *net.IPNet) error {
-	if err := EnsureV6AddressOnLink(ipa, ipn, dev.link); err != nil {
-		return fmt.Errorf("failed to ensure v6 address of interface %s: %w", dev.link.Attrs().Name, err)
+	if err := EnsureV6AddressOnLink(ipa, ipn, dev.Link); err != nil {
+		return fmt.Errorf("failed to ensure v6 address of interface %s: %w", dev.Link.Attrs().Name, err)
 	}
 
-	if err := netlink.LinkSetUp(dev.link); err != nil {
-		return fmt.Errorf("failed to set v6 interface %s to UP state: %w", dev.link.Attrs().Name, err)
+	if err := netlink.LinkSetUp(dev.Link); err != nil {
+		return fmt.Errorf("failed to set v6 interface %s to UP state: %w", dev.Link.Attrs().Name, err)
 	}
 
 	// ensure vxlan device hadware mac
 	// See https://github.com/flannel-io/flannel/issues/1795
-	nLink, err := netlink.LinkByName(dev.link.LinkAttrs.Name)
+	nLink, err := netlink.LinkByName(dev.Link.LinkAttrs.Name)
 	if err == nil {
 		if vxlan, ok := nLink.(*netlink.Vxlan); ok {
 			if vxlan.Attrs().HardwareAddr.String() != dev.MACAddr().String() {
-				return fmt.Errorf("%s's v6 mac address wanted: %s, but got: %v", dev.link.Name, dev.MACAddr().String(), vxlan.HardwareAddr)
+				return fmt.Errorf("%s's v6 mac address wanted: %s, but got: %v", dev.Link.Name, dev.MACAddr().String(), vxlan.HardwareAddr)
 			}
 		}
 	}
@@ -170,7 +172,7 @@ func (dev *VxlanDevice) ConfigureIPv6(ipa, ipn *net.IPNet) error {
 }
 
 func (dev *VxlanDevice) MACAddr() net.HardwareAddr {
-	return dev.link.HardwareAddr
+	return dev.Link.HardwareAddr
 }
 
 type neighbor struct {
@@ -182,7 +184,7 @@ type neighbor struct {
 func (dev *VxlanDevice) AddFDB(n neighbor) error {
 	log.V(4).Infof("calling AddFDB: %v, %v", n.IP, n.MAC)
 	return netlink.NeighSet(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Family:       syscall.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
@@ -194,7 +196,7 @@ func (dev *VxlanDevice) AddFDB(n neighbor) error {
 func (dev *VxlanDevice) AddV6FDB(n neighbor) error {
 	log.V(4).Infof("calling AddV6FDB: %v, %v", n.IP6, n.MAC)
 	return netlink.NeighSet(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Family:       syscall.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
@@ -206,7 +208,7 @@ func (dev *VxlanDevice) AddV6FDB(n neighbor) error {
 func (dev *VxlanDevice) DelFDB(n neighbor) error {
 	log.V(4).Infof("calling DelFDB: %v, %v", n.IP, n.MAC)
 	return netlink.NeighDel(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		Family:       syscall.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
 		IP:           *n.IP,
@@ -217,7 +219,7 @@ func (dev *VxlanDevice) DelFDB(n neighbor) error {
 func (dev *VxlanDevice) DelV6FDB(n neighbor) error {
 	log.V(4).Infof("calling DelV6FDB: %v, %v", n.IP6, n.MAC)
 	return netlink.NeighDel(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		Family:       syscall.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
 		IP:           *n.IP6,
@@ -228,7 +230,7 @@ func (dev *VxlanDevice) DelV6FDB(n neighbor) error {
 func (dev *VxlanDevice) AddARP(n neighbor) error {
 	log.V(4).Infof("calling AddARP: %v, %v", n.IP, n.MAC)
 	return netlink.NeighSet(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Type:         syscall.RTN_UNICAST,
 		IP:           *n.IP,
@@ -239,7 +241,7 @@ func (dev *VxlanDevice) AddARP(n neighbor) error {
 func (dev *VxlanDevice) AddV6ARP(n neighbor) error {
 	log.V(4).Infof("calling AddV6ARP: %v, %v", n.IP6, n.MAC)
 	return netlink.NeighSet(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Type:         syscall.RTN_UNICAST,
 		IP:           *n.IP6,
@@ -250,7 +252,7 @@ func (dev *VxlanDevice) AddV6ARP(n neighbor) error {
 func (dev *VxlanDevice) DelARP(n neighbor) error {
 	log.V(4).Infof("calling DelARP: %v, %v", n.IP, n.MAC)
 	return netlink.NeighDel(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Type:         syscall.RTN_UNICAST,
 		IP:           *n.IP,
@@ -261,12 +263,92 @@ func (dev *VxlanDevice) DelARP(n neighbor) error {
 func (dev *VxlanDevice) DelV6ARP(n neighbor) error {
 	log.V(4).Infof("calling DelV6ARP: %v, %v", n.IP6, n.MAC)
 	return netlink.NeighDel(&netlink.Neigh{
-		LinkIndex:    dev.link.Index,
+		LinkIndex:    dev.Link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Type:         syscall.RTN_UNICAST,
 		IP:           *n.IP6,
 		HardwareAddr: n.MAC,
 	})
+}
+
+func (dev *VxlanDevice) ConfigurePeer(vxlanAddr *net.IP, vxlanMac net.HardwareAddr, deviceAddr *net.IP, dst *net.IPNet) error {
+	if err := util.Retry(func() error {
+		return dev.AddARP(neighbor{IP: vxlanAddr, MAC: vxlanMac})
+	}); err != nil {
+		log.Error("AddARP failed: ", err)
+		return err
+	}
+
+	if err := util.Retry(func() error {
+		return dev.AddFDB(neighbor{IP: deviceAddr, MAC: vxlanMac})
+	}); err != nil {
+		log.Error("AddFDB failed: ", err)
+		// Try to clean up the ARP entry then continue
+		if err := util.Retry(func() error {
+			return dev.DelARP(neighbor{IP: vxlanAddr, MAC: vxlanMac})
+		}); err != nil {
+			log.Error("DelARP failed: ", err)
+		}
+		return err
+	}
+
+	// Set the route - the kernel would ARP for the Gw IP address if it hadn't already been set above so make sure
+	// this is done last.
+	vxlanRoute := netlink.Route{
+		LinkIndex: dev.Link.Attrs().Index,
+		Scope:     netlink.SCOPE_UNIVERSE,
+		Dst:       dst,
+		Gw:        *vxlanAddr,
+	}
+	vxlanRoute.SetFlag(syscall.RTNH_F_ONLINK)
+
+	if err := util.Retry(func() error {
+		return netlink.RouteReplace(&vxlanRoute)
+	}); err != nil {
+
+		// Try to clean up both the ARP and FDB entries then continue
+		if err := dev.DelARP(neighbor{IP: vxlanAddr, MAC: vxlanMac}); err != nil {
+			log.Error("DelARP failed: ", err)
+		}
+		if err := dev.DelFDB(neighbor{IP: deviceAddr, MAC: vxlanMac}); err != nil {
+			log.Error("DelFDB failed: ", err)
+		}
+
+		return err
+	}
+	return nil
+}
+
+func (dev *VxlanDevice) RemovePeer(vxlanAddr *net.IP, vxlanMac net.HardwareAddr, deviceAddr *net.IP, dst *net.IPNet) error {
+	errs := field.ErrorList{}
+	if err := util.Retry(func() error {
+		return dev.DelARP(neighbor{IP: vxlanAddr, MAC: vxlanMac})
+	}); err != nil {
+		log.Error("DelARP failed: ", err)
+		errs = append(errs, &field.Error{Field: err.Error()})
+	}
+
+	if err := util.Retry(func() error {
+		return dev.DelFDB(neighbor{IP: deviceAddr, MAC: vxlanMac})
+	}); err != nil {
+		log.Error("DelFDB failed: ", err)
+		errs = append(errs, &field.Error{Field: err.Error()})
+	}
+
+	vxlanRoute := netlink.Route{
+		LinkIndex: dev.Link.Attrs().Index,
+		Scope:     netlink.SCOPE_UNIVERSE,
+		Dst:       dst,
+		Gw:        *vxlanAddr,
+	}
+	vxlanRoute.SetFlag(syscall.RTNH_F_ONLINK)
+	if err := util.Retry(func() error {
+		return netlink.RouteDel(&vxlanRoute)
+	}); err != nil {
+		log.Errorf("failed to delete vxlanRoute (%s -> %s): %v", vxlanRoute.Dst, vxlanRoute.Gw, err)
+		errs = append(errs, &field.Error{Field: err.Error()})
+	}
+	return errs.ToAggregate()
 }
 
 func vxlanLinksIncompat(l1, l2 netlink.Link) string {

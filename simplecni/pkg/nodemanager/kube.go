@@ -22,7 +22,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -215,7 +214,9 @@ func (ksm *kubeSubnetManager) handleUpdateLeaseEvent(oldObj, newObj interface{})
 		return
 	}
 	if apiequality.Semantic.DeepEqual(o.Spec.PodCIDRs, n.Spec.PodCIDRs) {
-		return
+		if apiequality.Semantic.DeepEqual(o.Annotations, n.Annotations) {
+			return
+		}
 	}
 
 	l, err := ksm.nodeToLease(*n)
@@ -229,7 +230,7 @@ func (ksm *kubeSubnetManager) handleUpdateLeaseEvent(oldObj, newObj interface{})
 // AcquireLease adds the flannel specific node annotations (defined in the struct LeaseAttrs) and returns a lease
 // with important information for the backend, such as the subnet. This function is called once by the backend when
 // registering
-func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs map[string]string) (*Lease, error) {
+func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context) (*Lease, error) {
 	var cachedNode *v1.Node
 	waitErr := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
 		cachedNode, err = ksm.nodeStore.Get(ksm.nodeName)
@@ -246,46 +247,6 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs map[string
 	n := cachedNode.DeepCopy()
 	if n.Spec.PodCIDR == "" {
 		return nil, fmt.Errorf("node %q pod cidr not assigned", ksm.nodeName)
-	}
-
-	changed := false
-
-	for k, v := range attrs {
-		annotationsKey := fmt.Sprintf("%s%s", constants.Prefix, k)
-		annotationsKey = strings.ToLower(annotationsKey)
-		if n.Annotations != nil && n.Annotations[annotationsKey] != v {
-			changed = true
-			n.Annotations[annotationsKey] = v
-		}
-	}
-	if changed {
-		oldData, err := json.Marshal(cachedNode)
-		if err != nil {
-			return nil, err
-		}
-
-		newData, err := json.Marshal(n)
-		if err != nil {
-			return nil, err
-		}
-
-		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create patch for node %q: %v", ksm.nodeName, err)
-		}
-
-		waitErr := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
-			_, err = ksm.client.CoreV1().Nodes().Patch(ctx, ksm.nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-			if err != nil {
-				log.V(2).Infof("Failed to patch node %q: %v", ksm.nodeName, err)
-				return false, nil
-			}
-			return true, nil
-		})
-		klog.Info("patch node annotations")
-		if waitErr != nil {
-			return nil, fmt.Errorf("timeout contacting kube-api, failed to patch node %q. Error: %v", ksm.nodeName, waitErr)
-		}
 	}
 
 	var CidrIPv4 []*net.IPNet
@@ -322,15 +283,21 @@ func (ksm *kubeSubnetManager) Run(ctx context.Context) {
 // nodeToLease updates the lease with information fetch from the node, e.g. PodCIDR
 func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l Lease, err error) {
 
+	l.AttrMap = make(map[string]string)
 	for _, podCidr := range n.Spec.PodCIDRs {
 		ip, cidr, err := net.ParseCIDR(podCidr)
 		if err != nil {
 			klog.Errorf("pod cidr %s parse err: %v", podCidr, err)
 		}
-		if ip.To4() == nil {
+		if ip.To4() != nil {
 			l.CidrIPv4 = append(l.CidrIPv4, cidr)
 		} else {
 			l.CidrIPv6 = append(l.CidrIPv6, cidr)
+		}
+	}
+	for k, v := range n.Annotations {
+		if strings.HasPrefix(k, constants.Prefix) {
+			l.AttrMap[k] = v
 		}
 	}
 	return l, nil
@@ -342,7 +309,65 @@ func (ksm *kubeSubnetManager) Name() string {
 
 // CompleteLease Set Kubernetes NodeNetworkUnavailable to false when starting
 // https://kubernetes.io/docs/concepts/architecture/nodes/#condition
-func (ksm *kubeSubnetManager) CompleteLease(ctx context.Context, lease *Lease, wg *sync.WaitGroup) error {
+func (ksm *kubeSubnetManager) CompleteLease(ctx context.Context, attrs map[string]string) error {
+	var cachedNode *v1.Node
+	waitErr := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
+		cachedNode, err = ksm.nodeStore.Get(ksm.nodeName)
+		if err != nil {
+			log.V(2).Infof("Failed to get node %q: %v", ksm.nodeName, err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("timeout contacting kube-api, failed to patch node %q. Error: %v", ksm.nodeName, waitErr)
+	}
+
+	n := cachedNode.DeepCopy()
+	if n.Spec.PodCIDR == "" {
+		return fmt.Errorf("node %q pod cidr not assigned", ksm.nodeName)
+	}
+
+	changed := false
+
+	for k, v := range attrs {
+		annotationsKey := fmt.Sprintf("%s%s", constants.Prefix, k)
+		annotationsKey = strings.ToLower(annotationsKey)
+		if n.Annotations != nil && n.Annotations[annotationsKey] != v {
+			changed = true
+			n.Annotations[annotationsKey] = v
+		}
+	}
+	if changed {
+		oldData, err := json.Marshal(cachedNode)
+		if err != nil {
+			return err
+		}
+
+		newData, err := json.Marshal(n)
+		if err != nil {
+			return err
+		}
+
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+		if err != nil {
+			return fmt.Errorf("failed to create patch for node %q: %v", ksm.nodeName, err)
+		}
+
+		waitErr := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
+			_, err = ksm.client.CoreV1().Nodes().Patch(ctx, ksm.nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+			if err != nil {
+				log.V(2).Infof("Failed to patch node %q: %v", ksm.nodeName, err)
+				return false, nil
+			}
+			return true, nil
+		})
+		klog.Info("patch node annotations")
+		if waitErr != nil {
+			return fmt.Errorf("timeout contacting kube-api, failed to patch node %q. Error: %v", ksm.nodeName, waitErr)
+		}
+	}
+
 	condition := v1.NodeCondition{
 		Type:               v1.NodeNetworkUnavailable,
 		Status:             v1.ConditionFalse,

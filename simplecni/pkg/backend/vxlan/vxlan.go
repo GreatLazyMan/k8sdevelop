@@ -2,13 +2,15 @@ package vxlan
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"strings"
 
+	"github.com/GreatLazyMan/simplecni/pkg/constants"
 	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
 	"github.com/GreatLazyMan/simplecni/pkg/nodemanager"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
-	"github.com/cloudflare/cfssl/log"
 	"k8s.io/klog/v2"
 )
 
@@ -17,26 +19,61 @@ const (
 	MTU         = "1450"
 	MTUint      = 1450
 	DevieName   = "simplevxlan"
+	VxlanIP     = "VxlanIP"
+	VxlanMac    = "VxlanMac"
 )
 
 type VxlanBackend struct {
 	KubeConfig string
 	Config     *netconfig.Config
+	Device     *network.VxlanDevice
 }
 
-func (v *VxlanBackend) ConfigureRoute(event nodemanager.Event) {
+func (v *VxlanBackend) HandleEvent(event nodemanager.Event) {
+
+	// This route is used when traffic should be vxlan encapsulated
+
+	if len(event.Lease.CidrIPv4) == 0 {
+		klog.Warning("CidrIPv4 is empty")
+		return
+	}
+	var vxlanAddr net.IP
+	var vxlanMac net.HardwareAddr
+	var deviceAddr net.IP
+
+	vxlanAddrKey := strings.ToLower(fmt.Sprintf("%s%s", constants.Prefix, VxlanIP))
+	if vxlanAddrStr, ok := event.Lease.AttrMap[vxlanAddrKey]; ok {
+		vxlanAddr = net.ParseIP(vxlanAddrStr)
+	} else {
+		klog.Errorf("can't find key %s", vxlanAddrKey)
+		return
+	}
+
+	vxlanMacKey := strings.ToLower(fmt.Sprintf("%s%s", constants.Prefix, VxlanMac))
+	if vxlanMacStr, ok := event.Lease.AttrMap[vxlanMacKey]; ok {
+		vxlanMac, _ = net.ParseMAC(vxlanMacStr)
+	} else {
+		klog.Errorf("can't find key %s", vxlanMacKey)
+		return
+	}
+
+	deviceAddrKey := strings.ToLower(fmt.Sprintf("%s%s", constants.Prefix, netconfig.IPAddr))
+	if deviceAddrStr, ok := event.Lease.AttrMap[deviceAddrKey]; ok {
+		deviceAddr = net.ParseIP(deviceAddrStr)
+	} else {
+		klog.Errorf("can't find key %s", deviceAddrKey)
+		return
+	}
 
 	switch event.Type {
 	case nodemanager.EventAdded:
-		log.Infof("Subnet added: %v", event.Lease.CidrIPv4[0])
-		//routeAdd(route, netlink.FAMILY_V4, n.addToRouteList, n.removeFromV4RouteList)
-	case nodemanager.EventRemoved:
-		log.Infof("Subnet del: %v", event.Lease.CidrIPv4[0])
-		//n.removeFromV4RouteList(*route)
-	default:
-		log.Error("Internal error: unknown event type: ", int(event.Type))
-	}
+		klog.Infof("config perr vxlan: %v, %v, local aadr: %v, cidr: %v", vxlanAddr, vxlanMac, deviceAddr, event.Lease.CidrIPv4)
+		v.Device.ConfigurePeer(&vxlanAddr, vxlanMac, &deviceAddr, event.Lease.CidrIPv4[0])
 
+	case nodemanager.EventRemoved:
+		klog.Infof("removd perr vxlan: %v, %v, local aadr: %v, cidr: %v", vxlanAddr, vxlanMac, deviceAddr, event.Lease.CidrIPv4)
+		v.Device.RemovePeer(&vxlanAddr, vxlanMac, &deviceAddr, event.Lease.CidrIPv4[0])
+	}
 }
 
 func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string {
@@ -60,7 +97,7 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 
 	// get node info
 	leaseWatchChan := make(chan nodemanager.Event)
-	lease, err := nodeManager.AcquireLease(ctx, v.Config.Configmap)
+	lease, err := nodeManager.AcquireLease(ctx)
 	if err != nil {
 		klog.Errorf("acquire node info error: %v", err)
 		return
@@ -83,17 +120,26 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		MTU:       v.Config.Netlink.Attrs().MTU,
 	}
 
-	vlanxDevice, err := network.NewVXLANDevice(&vAttr)
+	vxlanDevice, err := network.NewVXLANDevice(&vAttr)
 	if err != nil {
 		klog.Errorf("init vxlan device error: %v", err)
 		return
 	}
+	v.Device = vxlanDevice
 
 	vxlanAddr := lease.CidrIPv4[0]
 	vxlanAddr.Mask = network.Localhost.Mask
-	err = vlanxDevice.Configure(vxlanAddr, lease.CidrIPv4[0])
+	err = vxlanDevice.Configure(vxlanAddr, lease.CidrIPv4[0])
 	if err != nil {
 		klog.Errorf("configure vxlan device error: %v", err)
+		return
+	}
+
+	v.Config.Configmap[VxlanMac] = vxlanDevice.Link.HardwareAddr.String()
+	v.Config.Configmap[VxlanIP] = lease.CidrIPv4[0].IP.To4().String()
+	err = nodeManager.CompleteLease(ctx, v.Config.Configmap)
+	if err != nil {
+		klog.Errorf("completelease, patch node annotations or status error: %v", err)
 		return
 	}
 
@@ -106,7 +152,7 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		select {
 		case event := <-leaseWatchChan:
 			klog.Infof("event is %v", event)
-			v.ConfigureRoute(event)
+			v.HandleEvent(event)
 		case <-ctx.Done():
 			close(leaseWatchChan)
 			return
