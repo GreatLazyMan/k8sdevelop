@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/GreatLazyMan/simplecni/pkg/backend/iptmanager"
 	"github.com/GreatLazyMan/simplecni/pkg/constants"
 	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
 	"github.com/GreatLazyMan/simplecni/pkg/nodemanager"
@@ -80,10 +81,10 @@ func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string 
 	subnetMap := make(map[string]string)
 	subnetMap["MTU"] = MTU
 	if len(lease.CidrIPv4) > 0 {
-		subnetMap["SUBNET"] = lease.CidrIPv4[0].String()
+		subnetMap[constants.SUBNET] = lease.CidrIPv4[0].String()
 	}
 	if len(lease.CidrIPv6) > 0 {
-		subnetMap["IPV6_SUBNET"] = lease.CidrIPv6[0].String()
+		subnetMap[constants.IPV6_SUBNET] = lease.CidrIPv6[0].String()
 	}
 	return subnetMap
 }
@@ -95,6 +96,7 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		return
 	}
 
+	var iptManager iptmanager.IPTablesManager
 	// get node info
 	leaseWatchChan := make(chan nodemanager.Event)
 	lease, err := nodeManager.AcquireLease(ctx)
@@ -102,6 +104,8 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		klog.Errorf("acquire node info error: %v", err)
 		return
 	}
+	iptManager.Init(lease.CidrIPv4[0], lease.ClusterCidrIPv4, nil, lease.ClusterCidrIPv6)
+	iptManager.SetupAndEnsureMasqRules(ctx, 1)
 
 	// write subnet file info
 	subnetMap := v.GetSubnetMap(lease)

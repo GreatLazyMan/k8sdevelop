@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
+	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog/v2"
@@ -130,4 +132,24 @@ func ParseConfig(s string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func ReadCIDRFromSubnetFile(CIDRKey string) (*net.IPNet, error) {
+	prevCIDRString, err := files.ReadKeyFromSubnetFile(CIDRKey)
+	if err != nil {
+		return nil, fmt.Errorf("read %s from subnetfile error: %v", CIDRKey, err)
+	}
+	cidrs := strings.Split(prevCIDRString, ",")
+
+	if len(cidrs) == 0 {
+		klog.Warningf("no subnet found for key %s ", CIDRKey)
+		return nil, nil
+	} else if len(cidrs) > 1 {
+		klog.Errorf("error reading subnet: more than 1 entry found for key %s: %v", CIDRKey, cidrs)
+		return nil, err
+	} else {
+
+		_, prevCIDRs, _ := net.ParseCIDR(cidrs[0])
+		return prevCIDRs, nil
+	}
 }

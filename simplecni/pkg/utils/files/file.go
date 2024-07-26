@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/GreatLazyMan/simplecni/pkg/constants"
+	"github.com/joho/godotenv"
 )
 
 func WriteSubnetFile(subnetMap map[string]string) error {
@@ -32,4 +33,24 @@ func WriteSubnetFile(subnetMap map[string]string) error {
 	// atomically visible with the contents
 	return os.Rename(tempFile, constants.Path)
 	// TODO - is this safe? What if it's not on the same FS?
+}
+
+func ReadKeyFromSubnetFile(Key string) (string, error) {
+	_, err := os.Stat(constants.Path)
+	if err == nil {
+		prevSubnet, err := godotenv.Read(constants.Path)
+		if err != nil {
+			return "", err
+		}
+		if value, ok := prevSubnet[Key]; ok {
+			return value, nil
+		} else {
+			return "", nil
+		}
+	}
+	if os.IsNotExist(err) {
+		return "", nil
+	} else {
+		return "", err
+	}
 }

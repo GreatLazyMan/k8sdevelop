@@ -260,7 +260,49 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context) (*Lease, error) 
 		}
 	}
 
-	return &Lease{CidrIPv4: CidrIPv4, CidrIPv6: CidrIPv6}, nil
+	var cachedPods *v1.PodList
+	waitErr = wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(context.Context) (done bool, err error) {
+		cachedPods, err = ksm.client.CoreV1().Pods(constants.KUBE_SYSTEM).List(ctx, metav1.ListOptions{
+			LabelSelector: constants.CONTOLLER_SELECTOER,
+		})
+		if err != nil {
+			return false, fmt.Errorf("list kube-controller-manager pod error: %v", err)
+		}
+		return true, nil
+	})
+
+	if len(cachedPods.Items) == 0 {
+		return nil, fmt.Errorf("number of kube-controller-manager pod is 0, strange")
+	}
+	var ClusterCidr *net.IPNet
+	var ClusterCidrv6 *net.IPNet
+	controllerArgs := cachedPods.Items[0].Spec.Containers[0].Args
+	for _, arg := range controllerArgs {
+		if strings.Contains(arg, "cluster-cidr") {
+			klog.Infof("args %s", arg)
+			value := strings.Split(arg, "=")
+			if !strings.Contains(value[1], ",") {
+				_, ClusterCidr, _ = net.ParseCIDR(value[1])
+			} else {
+				cidrsStrList := strings.Split(value[1], ",")
+				if net.ParseIP(cidrsStrList[0]).To4() != nil {
+					_, ClusterCidr, _ = net.ParseCIDR(cidrsStrList[0])
+					_, ClusterCidrv6, _ = net.ParseCIDR(cidrsStrList[1])
+				} else {
+					_, ClusterCidr, _ = net.ParseCIDR(cidrsStrList[1])
+					_, ClusterCidrv6, _ = net.ParseCIDR(cidrsStrList[0])
+				}
+			}
+
+			break
+		} else {
+			continue
+		}
+	}
+
+	return &Lease{CidrIPv4: CidrIPv4, CidrIPv6: CidrIPv6,
+			ClusterCidrIPv4: ClusterCidr, ClusterCidrIPv6: ClusterCidrv6},
+		nil
 }
 
 // WatchLeases waits for the kubeSubnetManager to provide an event in case something relevant changed in the node data

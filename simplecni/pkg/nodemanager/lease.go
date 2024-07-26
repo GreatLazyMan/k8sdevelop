@@ -44,10 +44,12 @@ type LeaseAttrs struct {
 
 // Lease includes information about the lease
 type Lease struct {
-	CidrIPv4 []*net.IPNet
-	CidrIPv6 []*net.IPNet
-	Attrs    LeaseAttrs
-	AttrMap  map[string]string
+	CidrIPv4        []*net.IPNet
+	CidrIPv6        []*net.IPNet
+	ClusterCidrIPv4 *net.IPNet
+	ClusterCidrIPv6 *net.IPNet
+	Attrs           LeaseAttrs
+	AttrMap         map[string]string
 }
 
 func (la *LeaseAttrs) String() string {

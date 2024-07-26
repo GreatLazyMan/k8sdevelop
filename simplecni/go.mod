@@ -6,7 +6,9 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/containernetworking/cni v1.2.2
 	github.com/containernetworking/plugins v1.5.1
+	github.com/coreos/go-iptables v0.7.0
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
+	github.com/joho/godotenv v1.5.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/vishvananda/netlink v1.2.1-beta.2
