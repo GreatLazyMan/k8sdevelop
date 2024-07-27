@@ -109,18 +109,6 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 	return n, nil
 }
 
-func getIPAMRoutes(n *NetConf) ([]types.Route, error) {
-	rtes := []types.Route{}
-
-	if n.IPAM != nil && hasKey(n.IPAM, "routes") {
-		buf, _ := json.Marshal(n.IPAM["routes"])
-		if err := json.Unmarshal(buf, &rtes); err != nil {
-			return rtes, fmt.Errorf("failed to parse ipam.routes: %w", err)
-		}
-	}
-	return rtes, nil
-}
-
 func isSubnetAlreadyPresent(nws []*net.IPNet, nw *net.IPNet) bool {
 	compareMask := func(m1 net.IPMask, m2 net.IPMask) bool {
 		for i := range m1 {
