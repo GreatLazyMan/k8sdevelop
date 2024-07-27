@@ -300,14 +300,19 @@ func (iptr *ipTablesRestore) runWithOutput(args []string, stdin io.Reader) (stri
 
 	cmd := exec.Command(iptr.path, args...)
 	log.Infof("command is %s,args is %v", iptr.path, args)
+	var buf bytes.Buffer
+	teeReader := io.TeeReader(stdin, &buf)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	cmd.Stdin = stdin
+	cmd.Stdin = teeReader
 
 	if err := cmd.Run(); err != nil {
 		return stdout.String(), stderr.String(), err
 	}
 
+	dataStdin, _ := io.ReadAll(&buf)
+	log.Infof("command stdin is %s", string(dataStdin))
+	log.Infof("command stdin is %v %d", dataStdin, len(dataStdin))
 	return stdout.String(), stderr.String(), nil
 }
 
