@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/GreatLazyMan/simplecni/pkg/backend/iptmanager"
@@ -46,7 +47,7 @@ func (v *VxlanBackend) HandleEvent(event nodemanager.Event) {
 	if vxlanAddrStr, ok := event.Lease.AttrMap[vxlanAddrKey]; ok {
 		vxlanAddr = net.ParseIP(vxlanAddrStr)
 	} else {
-		klog.Errorf("can't find key %s", vxlanAddrKey)
+		klog.Warningf("can't find key %s", vxlanAddrKey)
 		return
 	}
 
@@ -89,6 +90,7 @@ func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string 
 	return subnetMap
 }
 func (v *VxlanBackend) Run(ctx context.Context) {
+	var err error
 	klog.Info("vxlan backend run")
 	nodeManager, err := nodemanager.NewSubnetManager(ctx, v.KubeConfig)
 	if err != nil {
@@ -96,7 +98,6 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		return
 	}
 
-	var iptManager iptmanager.IPTablesManager
 	// get node info
 	leaseWatchChan := make(chan nodemanager.Event)
 	lease, err := nodeManager.AcquireLease(ctx)
@@ -104,8 +105,20 @@ func (v *VxlanBackend) Run(ctx context.Context) {
 		klog.Errorf("acquire node info error: %v", err)
 		return
 	}
-	iptManager.Init(lease.CidrIPv4[0], lease.ClusterCidrIPv4, nil, lease.ClusterCidrIPv6)
-	iptManager.SetupAndEnsureMasqRules(ctx, 1)
+
+	// iptables or nfstables
+	klog.Infof("env is %s", os.Getenv("IPTABLES"))
+	if os.Getenv("IPTABLES") != constants.NFTABLES {
+		var iptManager iptmanager.IPTablesManager
+		err = iptManager.Init(ctx, lease.ClusterCidrIPv4, lease.CidrIPv4[0], lease.ClusterCidrIPv6, nil)
+	} else {
+		var nftManager iptmanager.NFTablesManager
+		err = nftManager.Init(ctx, lease.ClusterCidrIPv4, lease.CidrIPv4[0], lease.ClusterCidrIPv6, nil)
+	}
+	if err != nil {
+		klog.Errorf("init iptables manager err: %v", err)
+		return
+	}
 
 	// write subnet file info
 	subnetMap := v.GetSubnetMap(lease)

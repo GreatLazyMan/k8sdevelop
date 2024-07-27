@@ -42,6 +42,8 @@ spec:
               fieldPath: metadata.namespace
         - name: EVENT_QUEUE_DEPTH
           value: "5000"
+        - name: "IPTABLES"
+          value: "nf_tables"
         image: simplecni:v0.0.1
         imagePullPolicy: IfNotPresent
         name: simplecni

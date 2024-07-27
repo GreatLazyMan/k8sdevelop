@@ -276,7 +276,7 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context) (*Lease, error) 
 	}
 	var ClusterCidr *net.IPNet
 	var ClusterCidrv6 *net.IPNet
-	controllerArgs := cachedPods.Items[0].Spec.Containers[0].Args
+	controllerArgs := append(cachedPods.Items[0].Spec.Containers[0].Args, cachedPods.Items[0].Spec.Containers[0].Command...)
 	for _, arg := range controllerArgs {
 		if strings.Contains(arg, "cluster-cidr") {
 			klog.Infof("args %s", arg)
@@ -299,6 +299,7 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context) (*Lease, error) 
 			continue
 		}
 	}
+	klog.Infof("cluster cirdr is %v %v", ClusterCidr, ClusterCidrv6)
 
 	return &Lease{CidrIPv4: CidrIPv4, CidrIPv6: CidrIPv6,
 			ClusterCidrIPv4: ClusterCidr, ClusterCidrIPv6: ClusterCidrv6},

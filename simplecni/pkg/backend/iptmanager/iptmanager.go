@@ -28,8 +28,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/GreatLazyMan/simplecni/pkg/constants"
-	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
 	"github.com/GreatLazyMan/simplecni/pkg/utils/network"
 	"github.com/coreos/go-iptables/iptables"
 	log "k8s.io/klog/v2"
@@ -44,40 +42,35 @@ const (
 )
 
 type IPTablesManager struct {
-	ipv4Rules       []network.IPTablesRule
-	ipv6Rules       []network.IPTablesRule
-	forwardRules    []network.IPTablesRule
-	clustercidr     *net.IPNet
-	nodecidr        *net.IPNet
-	prevclustercidr *net.IPNet
-	prevnodecidr    *net.IPNet
-	// not support v6 now
-	clustercidrv6     *net.IPNet
-	nodecidrv6        *net.IPNet
-	prevclustercidrv6 *net.IPNet
-	prevnodecidrv6    *net.IPNet
+	ipv4Rules    []network.IPTablesRule
+	ipv6Rules    []network.IPTablesRule
+	forwardRules []network.IPTablesRule
+	*CidrManager
 }
 
-func (iptm *IPTablesManager) Init(ccidr, ncidr, ccidrv6, ncidrv6 *net.IPNet) error {
+func (iptm *IPTablesManager) Init(ctx context.Context, ccidr, ncidr, ccidrv6, ncidrv6 *net.IPNet) error {
 	log.Info("init iptables manager")
 	iptm.forwardRules = forwardRules(ccidr)
 	iptm.ipv4Rules = masqRules(ccidr, ncidr)
 	iptm.ipv6Rules = masqIP6Rules(ccidrv6, ncidrv6)
-	iptm.nodecidr = ncidr
-	iptm.clustercidr = ccidr
-	iptm.nodecidrv6 = ncidrv6
-	iptm.clustercidrv6 = ccidrv6
-	cidr, err := netconfig.ReadCIDRFromSubnetFile(constants.SUBNET)
-	if err != nil {
-		return err
-	}
-	iptm.prevnodecidr = cidr
 
-	cidr, err = netconfig.ReadCIDRFromSubnetFile(constants.CIDR)
+	cidrManager, err := NewCidrManager(ccidr, ncidr, ccidrv6, ncidrv6)
 	if err != nil {
 		return err
 	}
-	iptm.prevnodecidr = cidr
+	iptm.CidrManager = cidrManager
+
+	iptm.SetupAndEnsureMasqRules(ctx, 1)
+	iptm.SetupAndEnsureForwardRules(ctx, 1)
+	go func() {
+		<-ctx.Done()
+		time.Sleep(time.Second)
+		err := iptm.CleanUp()
+		if err != nil {
+			log.Errorf("iptables: error while cleaning-up: %v", err)
+		}
+	}()
+
 	return nil
 }
 

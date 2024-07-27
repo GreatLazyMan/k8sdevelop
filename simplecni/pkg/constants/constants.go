@@ -9,4 +9,5 @@ const (
 	IPV6_CIDR           = "IPV6_CIDR"
 	CONTOLLER_SELECTOER = "component=kube-controller-manager"
 	KUBE_SYSTEM         = "kube-system"
+	NFTABLES            = "nf_tables"
 )

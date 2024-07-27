@@ -299,6 +299,7 @@ func (iptr *ipTablesRestore) runWithOutput(args []string, stdin io.Reader) (stri
 	}
 
 	cmd := exec.Command(iptr.path, args...)
+	log.Infof("command is %s,args is %v", iptr.path, args)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Stdin = stdin
