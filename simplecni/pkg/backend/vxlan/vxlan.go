@@ -87,6 +87,7 @@ func (v *VxlanBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]string 
 	if len(lease.CidrIPv6) > 0 {
 		subnetMap[constants.IPV6_SUBNET] = lease.CidrIPv6[0].String()
 	}
+	subnetMap["IPMASQ"] = "true"
 	return subnetMap
 }
 func (v *VxlanBackend) Run(ctx context.Context) {

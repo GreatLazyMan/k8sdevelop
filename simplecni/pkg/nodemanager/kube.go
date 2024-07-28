@@ -42,7 +42,6 @@ import (
 	log "k8s.io/klog/v2"
 
 	"github.com/GreatLazyMan/simplecni/pkg/constants"
-	"github.com/GreatLazyMan/simplecni/pkg/utils/files"
 )
 
 var (
@@ -426,12 +425,4 @@ func (ksm *kubeSubnetManager) CompleteLease(ctx context.Context, attrs map[strin
 	patch := []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw))
 	_, err = ksm.client.CoreV1().Nodes().PatchStatus(ctx, ksm.nodeName, patch)
 	return err
-}
-
-// flannel/pkg/subnet/kube/kube.go
-// HandleSubnetFile writes the configuration file used by the CNI flannel plugin
-// and stores the immutable data in a dedicated struct of the subnet manager
-// so that we can update the file later when a clustercidr resource is created.
-func (m *kubeSubnetManager) HandleSubnetFile(subnetMap map[string]string) error {
-	return files.WriteSubnetFile(subnetMap)
 }
