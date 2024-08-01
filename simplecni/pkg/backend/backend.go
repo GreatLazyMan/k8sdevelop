@@ -6,6 +6,7 @@ import (
 
 	"github.com/GreatLazyMan/simplecni/cmd/options"
 	"github.com/GreatLazyMan/simplecni/pkg/backend/vxlan"
+	"github.com/GreatLazyMan/simplecni/pkg/backend/wireguard"
 	"github.com/GreatLazyMan/simplecni/pkg/netconfig"
 	"k8s.io/klog/v2"
 )
@@ -31,6 +32,8 @@ func NewNetworkBackend(opts *options.CmdLineOpts) NetworkBackend {
 	switch backendType {
 	case vxlan.BackendType:
 		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Config: sc}
+	case wireguard.BackendType:
+		return &wireguard.WireguardBackend{KubeConfig: opts.KubeConfig, Config: sc, Ctx: opts.Ctx, Cancel: opts.Cancel}
 	default:
 		return &vxlan.VxlanBackend{KubeConfig: opts.KubeConfig, Config: sc}
 	}

@@ -102,6 +102,8 @@ func run() error {
 	// to block until all the goroutines return . If those goroutines spawn other goroutines then they are responsible for
 	// blocking and returning only when cancel() is called.
 	ctx, cancel := context.WithCancel(context.Background())
+	opts.Ctx = ctx
+	opts.Cancel = cancel
 	defer cancel()
 
 	// do some init work

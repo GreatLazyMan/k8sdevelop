@@ -23,7 +23,7 @@ data:
   net-conf.json: |
     {
       "Backend": {
-        "Type": "bridge"
+        "Type": "wireguard"
       }
     }
 kind: ConfigMap
