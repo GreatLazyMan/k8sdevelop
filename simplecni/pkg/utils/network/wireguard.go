@@ -256,11 +256,15 @@ func (w *WireguarDevice) AddPeers(peerIP *net.IP, peerCidr *net.IPNet, publicKey
 	if err != nil {
 		return fmt.Errorf("get wireguard device error: %v", err)
 	}
-	//xxx, _ := base64.StdEncoding.DecodeString(publicKey)
-	//yyy, _ := wgtypes.NewKey(xxx)
 	parsedPublicKey, err := wgtypes.ParseKey(publicKey)
 	if err != nil {
 		return fmt.Errorf("parse public key: %v", err)
+	}
+
+	mask := net.CIDRMask(32, 32)
+	peerIPCidr := net.IPNet{
+		IP:   *peerIP,
+		Mask: mask,
 	}
 
 	peerConfigs := peerToPeerConfigSlice(device.Peers)
@@ -269,6 +273,7 @@ func (w *WireguarDevice) AddPeers(peerIP *net.IP, peerCidr *net.IPNet, publicKey
 		Endpoint:  &net.UDPAddr{IP: *peerIP, Port: DefaultWgPort},
 		AllowedIPs: []net.IPNet{
 			*peerCidr,
+			peerIPCidr,
 		},
 		PersistentKeepaliveInterval: &TimeInterval,
 	}
