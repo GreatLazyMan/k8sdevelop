@@ -267,6 +267,8 @@ func (w *WireguarDevice) AddPeers(peerIP *net.IP, peerCidr *net.IPNet, publicKey
 		Mask: mask,
 	}
 
+	//https://github.com/WireGuard/wgctrl-go/issues/146
+	// PublicKey can't be same server's PublicKey
 	peerConfigs := peerToPeerConfigSlice(device.Peers)
 	peerConfig := wgtypes.PeerConfig{
 		PublicKey: parsedPublicKey,
