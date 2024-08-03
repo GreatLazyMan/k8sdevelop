@@ -27,6 +27,11 @@ import (
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
+	log "github.com/sirupsen/logrus"
+)
+
+const (
+	Wireguard = "wireguard"
 )
 
 // Return IPAM section for Delegate using input IPAM if present and replacing
@@ -64,20 +69,58 @@ func getDelegateIPAM(n *NetConf, senv *subnetEnv) (map[string]interface{}, error
 
 // generated cni Delegate/ipam object
 func doCmdAdd(args *skel.CmdArgs, n *NetConf, senv *subnetEnv) error {
-	n.Delegate["name"] = n.Name
-
-	if !hasKey(n.Delegate, "type") {
-		n.Delegate["type"] = "bridge"
-	}
-
+	ipam, err := getDelegateIPAM(n, senv)
 	if !hasKey(n.Delegate, "ipMasq") {
-		ipmasq := !senv.ipmasq
+		ipmasq := !*senv.ipmasq
 		n.Delegate["ipMasq"] = ipmasq
 	}
+	if err != nil {
+		return fmt.Errorf("failed to assemble Delegate IPAM: %w", err)
+	}
+	if n.CNIVersion != "" {
+		n.Delegate["cniVersion"] = n.CNIVersion
+	}
+	n.Delegate["ipam"] = ipam
 
 	if !hasKey(n.Delegate, "mtu") {
 		mtu := senv.mtu
 		n.Delegate["mtu"] = mtu
+	}
+
+	// wireguard
+	if Wireguard == senv.backend {
+		/*
+		   "ipam": {
+		       "type": "host-local",
+		       "subnet": "172.18.12.0/24",
+		       "rangeStart": "172.18.12.211",
+		       "rangeEnd": "172.18.12.230",
+		       "gateway": "172.18.12.1",
+		       "routes": [
+		           {
+		               "dst": "0.0.0.0/0"
+		           }
+		       ]
+		   }
+		*/
+		n.Delegate["name"] = "simplecni"
+		n.Delegate["type"] = "ptp"
+		log.WithFields(log.Fields{
+			"file":     "simple_linux.go",
+			"function": "doCmdAdd",
+		}).Infof("type is %s", n.Delegate["type"])
+
+		var routes []map[string]interface{}
+		routes = append(routes, map[string]interface{}{
+			"dst": "0.0.0.0/0",
+		})
+		ipam["routes"] = routes
+		n.Delegate["ipam"] = ipam
+	} else {
+		n.Delegate["name"] = n.Name
+		if !hasKey(n.Delegate, "type") {
+			n.Delegate["type"] = "bridge"
+		}
 	}
 
 	if n.Delegate["type"].(string) == "bridge" {
@@ -85,16 +128,13 @@ func doCmdAdd(args *skel.CmdArgs, n *NetConf, senv *subnetEnv) error {
 			n.Delegate["isGateway"] = true
 		}
 	}
-	if n.CNIVersion != "" {
-		n.Delegate["cniVersion"] = n.CNIVersion
-	}
-
-	ipam, err := getDelegateIPAM(n, senv)
-	if err != nil {
-		return fmt.Errorf("failed to assemble Delegate IPAM: %w", err)
-	}
-	n.Delegate["ipam"] = ipam
 	fmt.Fprintf(os.Stderr, "\n%#v\n", n.Delegate)
+
+	log.WithFields(log.Fields{
+		"file":     "simple_linux.go",
+		"function": "doCmdAdd",
+	}).Infof("doCmdAdd args.ContainerID: %v, DataDir: %v, Delegate: %v, ipam: %v",
+		args.ContainerID, n.DataDir, n.Delegate, n.Delegate["ipam"])
 
 	return delegateAdd(args.ContainerID, n.DataDir, n.Delegate)
 }

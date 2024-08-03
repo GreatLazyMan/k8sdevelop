@@ -16,6 +16,7 @@ import (
 
 const (
 	BackendType = "wireguard"
+	WgPublicKey = "WgPublicKey"
 )
 
 type WireguardBackend struct {
@@ -42,11 +43,12 @@ func (w *WireguardBackend) HandleEvent(event nodemanager.Event) {
 		klog.Errorf("can't find key %s", deviceAddrKey)
 		return
 	}
+	wgPublicKey := strings.ToLower(fmt.Sprintf("%s%s", constants.Prefix, WgPublicKey))
 
 	switch event.Type {
 	case nodemanager.EventAdded:
-		klog.Infof("add peer: %v %v", deviceAddr, event.Lease.CidrIPv4)
-		w.Device.AddPeers(&deviceAddr, event.Lease.CidrIPv4[0])
+		klog.Infof("add peer: %v %v %v", deviceAddr, event.Lease.CidrIPv4, event.Lease.AttrMap)
+		w.Device.AddPeers(&deviceAddr, event.Lease.CidrIPv4[0], event.Lease.AttrMap[wgPublicKey])
 
 	case nodemanager.EventRemoved:
 		klog.Infof("del peer: %v %v", deviceAddr, event.Lease.CidrIPv4)
@@ -63,6 +65,7 @@ func (w *WireguardBackend) GetSubnetMap(lease *nodemanager.Lease) map[string]str
 		subnetMap[constants.IPV6_SUBNET] = lease.CidrIPv6[0].String()
 	}
 	subnetMap["IPMASQ"] = "true"
+	subnetMap["BACKEND"] = "wireguard"
 	return subnetMap
 }
 
@@ -108,7 +111,7 @@ func (w *WireguardBackend) Run(ctx context.Context) {
 	klog.Info("write subnetMap")
 
 	// init wireguard devie
-	wgdevice, err := network.NewWireguardDevice(w.Ctx, w.Cancel)
+	wgdevice, err := network.NewWireguardDevice(w.Ctx, w.Cancel, lease.CidrIPv4[0])
 	if err != nil {
 		klog.Errorf("init wireguard device error: %v", err)
 		return
@@ -116,6 +119,7 @@ func (w *WireguardBackend) Run(ctx context.Context) {
 	w.Device = wgdevice
 	klog.Info("backend wireguard device is inited")
 
+	w.Config.Configmap[WgPublicKey] = wgdevice.PublicKey
 	err = nodeManager.CompleteLease(ctx, w.Config.Configmap)
 	if err != nil {
 		klog.Errorf("completelease, patch node annotations or status error: %v", err)

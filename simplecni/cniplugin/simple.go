@@ -60,12 +60,13 @@ type NetConf struct {
 }
 
 type subnetEnv struct {
-	nws    []*net.IPNet
-	sn     *net.IPNet
-	ip6Nws []*net.IPNet
-	ip6Sn  *net.IPNet
-	mtu    *uint
-	ipmasq bool
+	nws     []*net.IPNet
+	sn      *net.IPNet
+	ip6Nws  []*net.IPNet
+	ip6Sn   *net.IPNet
+	mtu     *uint
+	ipmasq  *bool
+	backend string
 }
 
 func init() {
@@ -89,12 +90,12 @@ func (se *subnetEnv) missing() string {
 	if se.sn == nil && se.ip6Sn == nil {
 		m = append(m, []string{"SUBNET", "IPV6_SUBNET"}...)
 	}
-	if se.mtu == nil {
-		m = append(m, "MTU")
-	}
-	//if se.ipmasq == nil {
-	//	m = append(m, "IPMASQ")
+	//if se.mtu == nil {
+	//	m = append(m, "MTU")
 	//}
+	if se.ipmasq == nil {
+		m = append(m, "IPMASQ")
+	}
 	return strings.Join(m, ", ")
 }
 
@@ -187,7 +188,14 @@ func loadSubnetEnv(fn string) (*subnetEnv, error) {
 
 		case "IPMASQ":
 			ipmasq := parts[1] == "true"
-			se.ipmasq = ipmasq
+			se.ipmasq = &ipmasq
+
+		case "BACKEND":
+			//log.WithFields(log.Fields{
+			//	"file":     "simple.go",
+			//	"function": "loadSubnetEnv",
+			//}).Info("2222222222222222222")
+			se.backend = parts[1]
 		}
 	}
 	if err := s.Err(); err != nil {
@@ -279,6 +287,10 @@ func delegateAdd(cid, dataDir string, netconf map[string]interface{}) error {
 	result, err := invoke.DelegateAdd(context.TODO(), netconf["type"].(string), netconfBytes, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to delegate add: %w", err)
+		log.WithFields(log.Fields{
+			"file":     "simple.go",
+			"function": "delegateAdd",
+		}).Errorf("invoke.DelegateAdd error: %v", err)
 		return err
 	}
 	ret := result.Print()

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/GreatLazyMan/simplecni/pkg/utils/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/conn"
@@ -29,48 +30,48 @@ const (
 	ENV_WG_PROCESS_FOREGROUND = "WG_PROCESS_FOREGROUND"
 
 	DefaultDeviceName = "wg0"
-	DefaultPrivateKey = "qHOK8gjsjP5NN63UHJ29RlGIbaqsxNhBPAb6Cos8TXU="
-	DefaultPublicKey  = "eBdjVFnLDJKn5iPE5taZBFplzdP+4hqjmjGp/x5SJxw="
+	DefaultPrivateKey = "eBdjVFnLDJKn5iPE5taZBFplzdP+4hqjmjGp/x5SJ1w="
+	DefaultPublicKey  = "7XaAsFfFjjDYQqwnFxNxlQzgv6OVCN7g7y+eZlO/vFs="
+)
+
+var (
+	DefaultWgPort int = 51820
+	TimeInterval      = time.Second
 )
 
 type WireguarDevice struct {
-	Link   *netlink.Link
-	Client *wgctrl.Client
-	Name   string
+	Link      *netlink.Link
+	Client    *wgctrl.Client
+	Name      string
+	PublicKey string
 }
 
 var DefaultWgPublicKey wgtypes.Key
 var DefaultWgPrivateKey wgtypes.Key
 
 func init() {
-	DefaultWgPublicKey, _ = wgtypes.ParseKey(DefaultPrivateKey)
 	DefaultWgPrivateKey, _ = wgtypes.ParseKey(DefaultPublicKey)
 
 }
 
-func NewWireguardDevice(ctx context.Context, cancel context.CancelFunc) (*WireguarDevice, error) {
+func NewWireguardDevice(ctx context.Context, cancel context.CancelFunc, ipn *net.IPNet) (*WireguarDevice, error) {
 	interfaceName := DefaultDeviceName
 
 	// open TUN device (or use supplied fd)
-
 	tdev, err := func() (tun.Device, error) {
 		tunFdStr := os.Getenv(ENV_WG_TUN_FD)
 		if tunFdStr == "" {
 			return tun.CreateTUN(interfaceName, device.DefaultMTU)
 		}
-
 		// construct tun device from supplied fd
-
 		fd, err := strconv.ParseUint(tunFdStr, 10, 32)
 		if err != nil {
 			return nil, err
 		}
-
 		err = unix.SetNonblock(int(fd), true)
 		if err != nil {
 			return nil, err
 		}
-
 		file := os.NewFile(uintptr(fd), "")
 		return tun.CreateTUNFromFile(file, device.DefaultMTU)
 	}()
@@ -89,19 +90,16 @@ func NewWireguardDevice(ctx context.Context, cancel context.CancelFunc) (*Wiregu
 	klog.Info("created tun device")
 
 	// open UAPI file (or use supplied fd)
-
 	fileUAPI, err := func() (*os.File, error) {
 		uapiFdStr := os.Getenv(ENV_WG_UAPI_FD)
 		if uapiFdStr == "" {
 			return ipc.UAPIOpen(interfaceName)
 		}
-
 		// use supplied fd
 		fd, err := strconv.ParseUint(uapiFdStr, 10, 32)
 		if err != nil {
 			return nil, err
 		}
-
 		return os.NewFile(uintptr(fd), ""), nil
 	}()
 
@@ -117,7 +115,8 @@ func NewWireguardDevice(ctx context.Context, cancel context.CancelFunc) (*Wiregu
 		fmt.Sprintf("(%s) ", interfaceName),
 	)
 
-	device := device.NewDevice(tdev, conn.NewDefaultBind(), logger)
+	bind := conn.NewDefaultBind()
+	device := device.NewDevice(tdev, bind, logger)
 
 	uapi, err := ipc.UAPIListen(interfaceName, fileUAPI)
 	if err != nil {
@@ -127,8 +126,26 @@ func NewWireguardDevice(ctx context.Context, cancel context.CancelFunc) (*Wiregu
 	go backgroudRun(cancel, uapi, device)
 
 	klog.Info("Wireguard Device started")
+	wireguardLink, err := ensureWgLink(ctx, interfaceName, ipn)
+	if err != nil {
+		return nil, fmt.Errorf("ensure wireguard link err: %v", err)
+	}
+	client, wgdevice, err := configWgServer(interfaceName)
+	if err != nil {
+		return nil, fmt.Errorf("config wireguard server err: %v", err)
+	}
 
+	return &WireguarDevice{
+		Link:      wireguardLink,
+		Client:    client,
+		Name:      interfaceName,
+		PublicKey: wgdevice.PublicKey.String(),
+	}, nil
+}
+
+func ensureWgLink(ctx context.Context, interfaceName string, ipn *net.IPNet) (*netlink.Link, error) {
 	var wireguardLink *netlink.Link
+	var err error
 	for {
 		select {
 		case <-ctx.Done():
@@ -145,26 +162,54 @@ func NewWireguardDevice(ctx context.Context, cancel context.CancelFunc) (*Wiregu
 		time.Sleep(10 * time.Microsecond)
 		klog.Info("try to get wireguard link")
 	}
+	addr := netlink.Addr{IPNet: ipn}
+	if err := netlink.AddrAdd(*wireguardLink, &addr); err != nil {
+		return nil, fmt.Errorf("failed to add IP address %s to %s: %s", addr.String(), (*wireguardLink).Attrs().Name, err)
+	}
+	if err := netlink.LinkSetUp(*wireguardLink); err != nil {
+		return nil, fmt.Errorf("failed to set interface %s to UP state: %s", (*wireguardLink).Attrs().Name, err)
+	}
 	klog.Infof("wireguard device is inited: %v", (*wireguardLink).Attrs())
+
+	return wireguardLink, nil
+}
+
+func configWgServer(interfaceName string) (*wgctrl.Client, *wgtypes.Device, error) {
 	client, err := wgctrl.New()
 	if err != nil {
-		return nil, fmt.Errorf("create wireguard client err: %v", err)
+		return nil, nil, fmt.Errorf("create wireguard client err: %v", err)
 	}
 
-	config := wgtypes.Config{
-		PrivateKey: &DefaultWgPrivateKey,
-	}
 	klog.Info("start config privateKey")
+	privateKey, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		return nil, nil, fmt.Errorf("generate privatekey error: %v", err)
+	}
+	config := wgtypes.Config{
+		PrivateKey: &privateKey,
+	}
 	err = client.ConfigureDevice(interfaceName, config)
 	if err != nil {
 		klog.Errorf("config wireguard device error: %v", err)
-
-		return nil, fmt.Errorf("config wireguard device error: %v", err)
+		return nil, nil, fmt.Errorf("config wireguard device error: %v", err)
 	}
 	klog.Info("finish config privateKey")
 
-	return &WireguarDevice{Link: wireguardLink, Client: client, Name: interfaceName}, nil
+	wgdevice, err := client.Device(interfaceName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get wireguard device error: %v", err)
+	}
 
+	klog.Info("start config bind port")
+	config = wgtypes.Config{
+		ListenPort: &DefaultWgPort,
+	}
+	if err := client.ConfigureDevice(interfaceName, config); err != nil {
+		klog.Fatalf("can't config device port: %v", err)
+	}
+	klog.Info("finish config bind port")
+
+	return client, wgdevice, nil
 }
 
 func getdevice(deviceName string) (*netlink.Link, error) {
@@ -206,35 +251,63 @@ func peerToPeerConfigSliceExcludePeer(peers []wgtypes.Peer, peerIP *net.IP) []wg
 	return wgConfig
 }
 
-func (w *WireguarDevice) AddPeers(peerIP *net.IP, peerCidr *net.IPNet) error {
+func (w *WireguarDevice) AddPeers(peerIP *net.IP, peerCidr *net.IPNet, publicKey string) error {
 	device, err := w.Client.Device(DefaultDeviceName)
 	if err != nil {
 		return fmt.Errorf("get wireguard device error: %v", err)
 	}
+	//xxx, _ := base64.StdEncoding.DecodeString(publicKey)
+	//yyy, _ := wgtypes.NewKey(xxx)
+	parsedPublicKey, err := wgtypes.ParseKey(publicKey)
+	if err != nil {
+		return fmt.Errorf("parse public key: %v", err)
+	}
+
 	peerConfigs := peerToPeerConfigSlice(device.Peers)
 	peerConfig := wgtypes.PeerConfig{
-		PublicKey: DefaultWgPublicKey,
-		Endpoint:  &net.UDPAddr{IP: *peerIP, Port: 51820},
+		PublicKey: parsedPublicKey,
+		Endpoint:  &net.UDPAddr{IP: *peerIP, Port: DefaultWgPort},
 		AllowedIPs: []net.IPNet{
 			*peerCidr,
 		},
+		PersistentKeepaliveInterval: &TimeInterval,
 	}
 	peerConfigs = append(peerConfigs, peerConfig)
 
 	klog.Infof("add a new peer: %v", peerConfigs)
 
 	config := wgtypes.Config{
-		Peers: peerConfigs,
+		Peers: []wgtypes.PeerConfig{peerConfig},
 	}
 	err = w.Client.ConfigureDevice(w.Name, config)
 	if err != nil {
 		return fmt.Errorf("config peers error: %v", err)
 	}
+
+	device, err = w.Client.Device(DefaultDeviceName)
+	if err != nil {
+		return fmt.Errorf("get wireguard device error: %v", err)
+	}
+	klog.Infof("added peer, now device is: %v", device)
+	route := netlink.Route{
+		LinkIndex: (*w.Link).Attrs().Index,
+		Scope:     netlink.SCOPE_UNIVERSE,
+		Dst:       peerCidr,
+	}
+
+	//route.SetFlag(syscall.RTNH_F_ONLINK)
+
+	if err := util.Retry(func() error {
+		return netlink.RouteReplace(&route)
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (w *WireguarDevice) DelPeers(peerIP *net.IP) error {
-	device, err := w.Client.Device("wg0")
+	device, err := w.Client.Device(DefaultDeviceName)
 	if err != nil {
 		return fmt.Errorf("get wireguard device error: %v", err)
 	}
