@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eux
 CURRENT_DIR=$(dirname $0)
-CODE_DIR_NAME="simplescheduler"
+CODE_DIR_NAME="simpleschedulerframework"
 
 tar zcf /tmp/${CODE_DIR_NAME}.tar.gz ${CURRENT_DIR}/../../${CODE_DIR_NAME}
 tar zxf /tmp/${CODE_DIR_NAME}.tar.gz -C ${CURRENT_DIR}/../deploy/

@@ -14,7 +14,7 @@ spec:
     spec:
       schedulerName: sample-scheduler
       containers:
-      - image: nginx
+      - image: docker.io/library/nginx:1.27-alpine3.19
         imagePullPolicy: IfNotPresent
         name: nginx
         ports:

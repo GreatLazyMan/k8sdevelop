@@ -20,7 +20,6 @@ type Bar struct {
 type BarSpec struct {
 	DeploymentName string `json:"deploymentName"`
 	Image          string `json:"image"`
-	Replicas       *int32 `json:"replicas"`
 }
 
 // BarStatus is the status for a Bar resource

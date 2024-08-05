@@ -170,9 +170,8 @@ data:
     pluginConfig:
     - name: "sample-plugin"
       args:
-        favorite_color: "#326CE5"
-        favorite_number: 7
-        thanks_to: "thockin"
+        deploymentName: "nginx
+        image: "nginx"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -199,12 +198,10 @@ spec:
             name: scheduler-config
       containers:
         - name: scheduler-ctrl
-          image: cnych/sample-scheduler:v0.1.6
+          image: simpleschedulerframework:v0.0.1
           imagePullPolicy: IfNotPresent
-          args:
-            - sample-scheduler-framework
-            - --config=/etc/kubernetes/scheduler-config.yaml
-            - --v=3
+          command:
+            - /usr/local/bin/simplescheduler
           resources:
             requests:
               cpu: "50m"

@@ -8,19 +8,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+
+	simplev1 "github.com/GreatLazyMan/simplescheduler/pkg/apis/example.com/v1"
 )
 
 // 插件名称
 const Name = "simpleschedulerplugin"
 
-type Args struct {
-	FavoriteColor  string `json:"favorite_color,omitempty"`
-	FavoriteNumber int    `json:"favorite_number,omitempty"`
-	ThanksTo       string `json:"thanks_to,omitempty"`
-}
-
 type Sample struct {
-	args   *Args
+	args   *simplev1.Bar
 	handle framework.Handle
 }
 
@@ -53,8 +49,7 @@ func (s *Sample) PreBind(ctx context.Context, state *framework.CycleState, pod *
 
 // type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Plugin, error)
 func New(ctx context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
-
-	args, ok := configuration.(*Args)
+	args, ok := configuration.(*simplev1.Bar)
 	if !ok {
 		return nil, fmt.Errorf("expected PluginConfig, got %T", configuration)
 	}
