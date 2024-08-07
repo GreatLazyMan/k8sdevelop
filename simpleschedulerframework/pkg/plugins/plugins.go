@@ -9,27 +9,25 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 
-	simplev1 "github.com/GreatLazyMan/simplescheduler/pkg/apis/example.com/v1"
+	"github.com/GreatLazyMan/simplescheduler/pkg/apis/config"
 )
 
-// 插件名称
-const Name = "simpleschedulerplugin"
+const Name = "FooPlugin"
 
-type Sample struct {
-	args   *simplev1.Bar
+type FooPlugin struct {
 	handle framework.Handle
 }
 
-func (s *Sample) Name() string {
+func (s *FooPlugin) Name() string {
 	return Name
 }
 
-func (s *Sample) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (s *FooPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	klog.V(3).Infof("prefilter pod: %v", pod.Name)
 	return framework.NewStatus(framework.Success, "")
 }
 
-func (s *Sample) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (s *FooPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
@@ -38,7 +36,7 @@ func (s *Sample) Filter(ctx context.Context, state *framework.CycleState, pod *v
 	return framework.NewStatus(framework.Success, "")
 }
 
-func (s *Sample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (s *FooPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
@@ -48,14 +46,14 @@ func (s *Sample) PreBind(ctx context.Context, state *framework.CycleState, pod *
 }
 
 // type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Plugin, error)
-func New(ctx context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
-	args, ok := configuration.(*simplev1.Bar)
+func New(_ context.Context, plArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	args, ok := plArgs.(*config.FooPluginArgs)
 	if !ok {
-		return nil, fmt.Errorf("expected PluginConfig, got %T", configuration)
+		xx := plArgs.(*runtime.Unknown)
+		return nil, fmt.Errorf("expected PluginConfig, got %T,raw: %s", xx, string(xx.Raw))
 	}
 	klog.V(3).Infof("get plugin config args: %+v", args)
-	return &Sample{
-		args:   args,
+	return &FooPlugin{
 		handle: f,
 	}, nil
 }

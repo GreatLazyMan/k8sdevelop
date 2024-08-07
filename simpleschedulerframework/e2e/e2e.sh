@@ -17,4 +17,4 @@ sudo docker cp ${CURRENT_DIR}/../deploy ${CLUSTER_NAME}-control-plane:/
 sudo kind load docker-image simpleschedulerframework:v0.0.1 --name ${CLUSTER_NAME} 
 sudo kind load docker-image docker.io/library/nginx:1.27-alpine3.19 --name ${CLUSTER_NAME}
 
-sudo docker exec ${CLUSTER_NAME}-control-plane kubectl create -f deploy
+sudo docker exec ${CLUSTER_NAME}-control-plane kubectl apply -f deploy

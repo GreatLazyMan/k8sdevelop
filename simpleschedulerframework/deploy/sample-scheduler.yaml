@@ -16,6 +16,7 @@ rules:
       - ""
     resources:
       - nodes
+      - namespaces
     verbs:
       - get
       - list
@@ -100,6 +101,8 @@ rules:
     resources:
       - storageclasses
       - csinodes
+      - csistoragecapacities
+      - csidrivers
     verbs:
       - get
       - list
@@ -150,28 +153,22 @@ metadata:
   namespace: kube-system
 data:
   scheduler-config.yaml: |
-    apiVersion: kubescheduler.config.k8s.io/v1alpha1
+    apiVersion: kubescheduler.config.k8s.io/v1
     kind: KubeSchedulerConfiguration
-    schedulerName: sample-scheduler
     leaderElection:
       leaderElect: true
-      lockObjectName: sample-scheduler
-      lockObjectNamespace: kube-system
-    plugins:
-      preFilter:
-        enabled:
-        - name: "sample-plugin"
-      filter:
-        enabled:
-        - name: "sample-plugin"
-      preBind:
-        enabled:
-        - name: "sample-plugin"
-    pluginConfig:
-    - name: "sample-plugin"
-      args:
-        deploymentName: "nginx
-        image: "nginx"
+      resourceName: sample-scheduler
+      resourceNamespace: kube-system
+    profiles:
+    - schedulerName: sample-scheduler
+      plugins:
+        filter:
+          enabled:
+          - name: FooPlugin
+      pluginConfig:
+      - name: FooPlugin
+        args:
+          deploymentName: "nginx"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -202,6 +199,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command:
             - /usr/local/bin/simplescheduler
+            - --config=/etc/kubernetes/scheduler-config.yaml
           resources:
             requests:
               cpu: "50m"

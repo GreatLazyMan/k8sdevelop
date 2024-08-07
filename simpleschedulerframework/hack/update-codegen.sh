@@ -30,11 +30,15 @@ source "${CODEGEN_PKG}/kube_codegen.sh"
  
 kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    "${SCRIPT_ROOT}"/pkg/apis 
+    "${SCRIPT_ROOT}"/pkg/apis
  
-kube::codegen::gen_client \
-    --with-watch \
-    --output-pkg github.com/GreatLazyMan/simplescheduler/pkg/apis/example.com/v1 \
-    --output-dir "${SCRIPT_ROOT}/pkg/apis/example.com/v1/" \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    "${SCRIPT_ROOT}"/pkg/apis \
+#kube::codegen::gen_helpers \
+#    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+#    "${SCRIPT_ROOT}"/pkg/apis/config/v1/
+#
+#kube::codegen::gen_client \
+#    --with-watch \
+#    --output-pkg github.com/GreatLazyMan/simplescheduler/pkg/apis/example.com/v1 \
+#    --output-dir "${SCRIPT_ROOT}/pkg/apis/example.com/v1/" \
+#    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+#    "${SCRIPT_ROOT}"/pkg/apis \
