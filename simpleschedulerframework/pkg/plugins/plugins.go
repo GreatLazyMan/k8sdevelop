@@ -22,9 +22,13 @@ func (s *FooPlugin) Name() string {
 	return Name
 }
 
-func (s *FooPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (s *FooPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	klog.V(3).Infof("prefilter pod: %v", pod.Name)
-	return framework.NewStatus(framework.Success, "")
+	return nil, framework.NewStatus(framework.Success, "")
+}
+
+func (s *FooPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
 }
 
 func (s *FooPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
@@ -36,12 +40,8 @@ func (s *FooPlugin) Filter(ctx context.Context, state *framework.CycleState, pod
 	return framework.NewStatus(framework.Success, "")
 }
 
-func (s *FooPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
-	klog.V(3).Infof("prebind node info: %+v", node)
+func (s *FooPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	klog.V(3).Infof("prebind node info: %+v", nodeName)
 	return framework.NewStatus(framework.Success, "")
 }
 

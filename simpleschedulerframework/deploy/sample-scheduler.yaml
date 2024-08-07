@@ -162,13 +162,20 @@ data:
     profiles:
     - schedulerName: sample-scheduler
       plugins:
+        preFilter:
+          enabled:
+          - name: FooPlugin
         filter:
+          enabled:
+          - name: FooPlugin
+        preBind:
           enabled:
           - name: FooPlugin
       pluginConfig:
       - name: FooPlugin
         args:
           deploymentName: "nginx"
+          image: "nginx"
 ---
 apiVersion: apps/v1
 kind: Deployment
