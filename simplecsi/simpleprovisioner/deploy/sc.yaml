@@ -1,0 +1,11 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    simplecsi.io/basepath: /var/local/simplecsi
+    simplecsi.io/image: openebs/linux-utils:3.3.0
+    simplecsi.io/cas-type: local
+  name: hostpath
+provisioner: simplecsi.io/local
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sbusybox
+  namespace: default
+spec:
+  containers:
+  - command:
+       - sh
+       - -c
+       - 'date >> /mnt/store1/date.txt; hostname >> /mnt/store1/hostname.txt; sync; sleep 5; sync; tail -f /dev/null;'
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    name: busybox
+    volumeMounts:
+    - mountPath: /mnt/store1
+      name: demo-vol
+  volumes:
+  - name: demo-vol
+    persistentVolumeClaim:
+      claimName: demo-vol-claim
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: demo-vol-claim
+spec:
+  storageClassName: hostpath
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5G

@@ -6,12 +6,21 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"strings"
 	"sync"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
+	"github.com/GreatLazyMan/simplecsi/pkg/hostpath"
+	"github.com/GreatLazyMan/simplecsi/pkg/hostpath/controllerserver"
+	"github.com/GreatLazyMan/simplecsi/pkg/hostpath/identityserver"
+	"github.com/GreatLazyMan/simplecsi/pkg/hostpath/nodeserver"
+	"github.com/GreatLazyMan/simplecsi/pkg/k8sclient"
+	"github.com/GreatLazyMan/simplecsi/pkg/state"
 )
 
 func Parse(ep string) (string, string, error) {
@@ -27,7 +36,9 @@ func Parse(ep string) (string, string, error) {
 }
 
 type ServerConfig struct {
-	Endpoint string
+	Endpoint    string
+	Provisioner bool
+	CsiNode     bool
 }
 
 func NewServerconfig(endpoint string) ServerConfig {
@@ -36,13 +47,13 @@ func NewServerconfig(endpoint string) ServerConfig {
 	}
 }
 
-func Serve(opt *ServerConfig, ctx context.Context, wg *sync.WaitGroup) {
-
-	listener, cleanup, err := Listen(opt)
+func Serve(serverConfig *ServerConfig, cfg hostpath.Config, ctx context.Context, wg *sync.WaitGroup) {
+	listener, cleanup, err := Listen(serverConfig)
 	if err != nil {
 		klog.Errorf("Failed to listen: %v", err)
 	}
 	defer cleanup()
+	defer klog.Infof("Quit grpc server")
 
 	opts := []grpc.ServerOption{
 		grpc.UnaryInterceptor(logGRPC),
@@ -50,14 +61,56 @@ func Serve(opt *ServerConfig, ctx context.Context, wg *sync.WaitGroup) {
 	server := grpc.NewServer(opts...)
 	defer server.GracefulStop()
 
-	go server.Serve(listener)
+	err = os.MkdirAll(cfg.StateDir, 0750)
+	if err != nil {
+		wg.Done()
+		return
+	}
+	clientSet, err := k8sclient.GetKubernetesClient()
+	if err != nil {
+		klog.Errorf("create k8s clientSet err: %v", err)
+		wg.Done()
+		return
+	}
+	s, err := state.New(path.Join(cfg.StateDir, "state.json"), clientSet)
+	if err == nil {
+		klog.Infof("Driver: %v ", cfg.DriverName)
+		klog.Infof("Version: %s", cfg.VendorVersion)
 
-	select {
-	case <-ctx.Done():
+		hp := hostpath.HostPath{
+			Config:    &cfg,
+			State:     s,
+			ClientSet: clientSet,
+		}
+		hp.State.SetKubernetesClient(clientSet)
+
+		identityServer, err := identityserver.NewIdentityServer(&cfg)
+		if err != nil {
+			klog.Errorf("create NewHostPathDriver error: %v", err)
+		}
+		csi.RegisterIdentityServer(server, identityServer)
+
+		nodeServer, err := nodeserver.NewNodeServer(&hp)
+		if err != nil {
+			klog.Errorf("create NewHostPathDriver error: %v", err)
+		}
+		csi.RegisterNodeServer(server, nodeServer)
+
+		ctlServer, err := controllerserver.NewControllerServer(&hp)
+		if err != nil {
+			klog.Errorf("create NewHostPathDriver error: %v", err)
+		}
+		csi.RegisterControllerServer(server, ctlServer)
+
+		go server.Serve(listener)
+
+		select {
+		case <-ctx.Done():
+		}
+	} else {
+		klog.Errorf("create new state error: %v", err)
 	}
 	wg.Done()
-
-	klog.Infof("Quit grpc server")
 }
 
 func Listen(opt *ServerConfig) (net.Listener, func(), error) {

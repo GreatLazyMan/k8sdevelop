@@ -1,0 +1,17 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: my-csi-app
+spec:
+  containers:
+    - name: my-frontend
+      image: docker.io/library/busybox:latest
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+      - mountPath: "/data"
+        name: my-csi-volume
+      command: [ "sleep", "100" ]
+  volumes:
+    - name: my-csi-volume
+      persistentVolumeClaim:
+        claimName: csi-pvc # defined in csi-pvc.yaml

@@ -1,0 +1,53 @@
+# All of the individual sidecar RBAC roles get bound
+# to this account.
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: simplecsi-hostpathplugin-sa
+  namespace: default
+  labels:
+    app.kubernetes.io/name: simplecsi-hostpathplugin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: simplecsi-hostpathplugin
+  name: simplecsi-hostpathplugin-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: simplecsi-hostpathplugin-sa
+subjects:
+- kind: ServiceAccount
+  name: simplecsi-hostpathplugin-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/instance: hostpath.simplecsi.k8s.io
+  name: simplecsi-hostpathplugin-sa
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumes", "events", "nodes", "persistentvolumeclaims", "pods","configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["csinodes", "volumeattachments", "storageclasses", "volumeattachments/status", "csistoragecapacities"]
+  verbs: ["get", "list", "watch", "patch", "create", "update", "delete"]
+- apiGroups: ["snapshot.storage.k8s.io"]
+  resources: ["volumesnapshots", "volumesnapshotcontents", "volumesnapshotclasses"]
+  verbs: ["get", "list", "watch", "update", "patch", "create"]
+- apiGroups: ["groupsnapshot.storage.k8s.io"]
+  resources: ["volumegroupsnapshotclasses", "volumegroupsnapshotcontents"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "watch", "list", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get"]
