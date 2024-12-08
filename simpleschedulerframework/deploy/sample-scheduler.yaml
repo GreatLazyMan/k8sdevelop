@@ -164,15 +164,15 @@ data:
       plugins:
         preFilter:
           enabled:
-          - name: FooPlugin
+          - name: SimplePlugin
         filter:
           enabled:
-          - name: FooPlugin
+          - name: SimplePlugin
         preBind:
           enabled:
-          - name: FooPlugin
+          - name: SimplePlugin
       pluginConfig:
-      - name: FooPlugin
+      - name: SimplePlugin
         args:
           deploymentName: "nginx"
           image: "nginx"

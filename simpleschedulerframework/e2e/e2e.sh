@@ -11,7 +11,7 @@ CLUSTER_NAME="simplescheduler"
 CURRENT_DIR=$(dirname $0)
 
 if [ $(sudo kind get clusters  -q  | grep ${CLUSTER_NAME} | wc -l) -eq 0 ] ; then
-  sudo kind create cluster --image kindest/node:v1.30.2 --config ${CURRENT_DIR}/kind-example-config.yaml 
+  sudo kind create cluster --image kindest/node:v1.31.2 --config ${CURRENT_DIR}/kind-example-config.yaml 
 fi
 sudo docker cp ${CURRENT_DIR}/../deploy ${CLUSTER_NAME}-control-plane:/
 sudo kind load docker-image simpleschedulerframework:v0.0.1 --name ${CLUSTER_NAME} 

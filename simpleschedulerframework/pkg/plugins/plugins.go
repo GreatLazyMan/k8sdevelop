@@ -12,48 +12,49 @@ import (
 	"github.com/GreatLazyMan/simplescheduler/pkg/apis/config"
 )
 
-const Name = "FooPlugin"
+const Name = "SimplePlugin"
 
-type FooPlugin struct {
+type SimplePlugin struct {
 	handle framework.Handle
 }
 
-func (s *FooPlugin) Name() string {
+func (s *SimplePlugin) Name() string {
 	return Name
 }
 
-func (s *FooPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	klog.V(3).Infof("prefilter pod: %v", pod.Name)
+func (s *SimplePlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	klog.Infof("prefilter pod: %v", pod.Name)
 	return nil, framework.NewStatus(framework.Success, "")
 }
 
-func (s *FooPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+func (s *SimplePlugin) PreFilterExtensions() framework.PreFilterExtensions {
+	klog.Infof("PreFilterExtensions")
 	return nil
 }
 
-func (s *FooPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (s *SimplePlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
-	klog.V(3).Infof("filter pod: %v, node: %v", pod.Name, node.Name)
+	klog.Infof("filter pod: %v, node: %v", pod.Name, node.Name)
 	return framework.NewStatus(framework.Success, "")
 }
 
-func (s *FooPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
-	klog.V(3).Infof("prebind node info: %+v", nodeName)
+func (s *SimplePlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	klog.Infof("prebind node info: %+v", nodeName)
 	return framework.NewStatus(framework.Success, "")
 }
 
 // type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Plugin, error)
 func New(_ context.Context, plArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
-	args, ok := plArgs.(*config.FooPluginArgs)
+	args, ok := plArgs.(*config.SimplePluginArgs)
 	if !ok {
 		xx := plArgs.(*runtime.Unknown)
 		return nil, fmt.Errorf("expected PluginConfig, got %T,raw: %s", xx, string(xx.Raw))
 	}
-	klog.V(3).Infof("get plugin config args: %+v", args)
-	return &FooPlugin{
+	klog.Infof("get plugin config args: %+v", args)
+	return &SimplePlugin{
 		handle: f,
 	}, nil
 }
