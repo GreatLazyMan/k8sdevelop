@@ -76,12 +76,12 @@ func (c *RClusterController) processNextItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncToStdout(key.(RCCluster))
+	err := c.reconsile(key.(RCCluster))
 	c.handleErr(err, key)
 	return true
 }
 
-func (c *RClusterController) syncToStdout(key RCCluster) error {
+func (c *RClusterController) reconsile(key RCCluster) error {
 	klog.Infof("proecess: %v", key)
 	var obj interface{}
 	var exists bool

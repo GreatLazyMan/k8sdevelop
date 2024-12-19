@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,16 +7,34 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-scheduler
+      simple.io/pod-group: test
   template:
     metadata:
+      annotations:
+        simple.io/pod-group: test
       labels:
-        app: test-scheduler
+        simple.io/pod-group: test
     spec:
-      schedulerName: sample-scheduler
+      schedulerName: simple-scheduler
       containers:
       - image: docker.io/library/nginx:1.27-alpine3.19
         imagePullPolicy: IfNotPresent
         name: nginx
         ports:
         - containerPort: 80
+---
+apiVersion: simple.io/v1
+kind: PodGroup
+metadata:
+  name: test
+spec:
+  minReplicas: 3
+  queue: test
+---
+apiVersion: simple.io/v1
+kind: Queue
+metadata:
+  name: test
+spec:
+  resourceLimits:
+    cpu: 100m

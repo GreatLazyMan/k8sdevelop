@@ -30,7 +30,6 @@ images: $(IMAGE_TARGET)
 
 #upload-images: images
 	#@echo "push images to $(REGISTRY)"
-	#docker push ${REGISTRY}/clusterlink-controller-manager:${VERSION}
 
 .PHONY: lint
 lint: golangci-lint

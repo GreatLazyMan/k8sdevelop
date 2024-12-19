@@ -20,4 +20,6 @@ type ClusterExpansion interface{}
 
 type RealClusterExpansion interface{}
 
+type SimpleJobExpansion interface{}
+
 type VirtualClusterExpansion interface{}

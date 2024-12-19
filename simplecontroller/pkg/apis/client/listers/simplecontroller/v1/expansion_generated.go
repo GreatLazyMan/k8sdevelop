@@ -24,6 +24,14 @@ type ClusterListerExpansion interface{}
 // RealClusterLister.
 type RealClusterListerExpansion interface{}
 
+// SimpleJobListerExpansion allows custom methods to be added to
+// SimpleJobLister.
+type SimpleJobListerExpansion interface{}
+
+// SimpleJobNamespaceListerExpansion allows custom methods to be added to
+// SimpleJobNamespaceLister.
+type SimpleJobNamespaceListerExpansion interface{}
+
 // VirtualClusterListerExpansion allows custom methods to be added to
 // VirtualClusterLister.
 type VirtualClusterListerExpansion interface{}

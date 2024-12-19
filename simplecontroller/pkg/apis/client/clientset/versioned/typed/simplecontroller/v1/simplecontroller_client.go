@@ -28,6 +28,7 @@ type GreatlazymanV1Interface interface {
 	RESTClient() rest.Interface
 	ClustersGetter
 	RealClustersGetter
+	SimpleJobsGetter
 	VirtualClustersGetter
 }
 
@@ -42,6 +43,10 @@ func (c *GreatlazymanV1Client) Clusters() ClusterInterface {
 
 func (c *GreatlazymanV1Client) RealClusters() RealClusterInterface {
 	return newRealClusters(c)
+}
+
+func (c *GreatlazymanV1Client) SimpleJobs(namespace string) SimpleJobInterface {
+	return newSimpleJobs(c, namespace)
 }
 
 func (c *GreatlazymanV1Client) VirtualClusters() VirtualClusterInterface {

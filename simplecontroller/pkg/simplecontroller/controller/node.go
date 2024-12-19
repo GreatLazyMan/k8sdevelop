@@ -73,6 +73,7 @@ func (c *NodeController) Reconcile(ctx context.Context, request reconcile.Reques
 	if err := c.Get(ctx, request.NamespacedName, resource); err != nil {
 		if errors.IsNotFound(err) {
 			klog.Infof("Node %s has be deleted", request.Name)
+			return controllerruntime.Result{}, nil
 		}
 		klog.Errorf("get Node %s error:", err)
 		return controllerruntime.Result{
@@ -81,6 +82,7 @@ func (c *NodeController) Reconcile(ctx context.Context, request reconcile.Reques
 	}
 	if !resource.DeletionTimestamp.IsZero() {
 		klog.Infof("Node %s has been deleted", request.Name)
+		return controllerruntime.Result{}, nil
 	}
 
 	return controllerruntime.Result{}, nil

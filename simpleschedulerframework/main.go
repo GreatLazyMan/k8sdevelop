@@ -4,16 +4,17 @@ import (
 	"os"
 
 	_ "github.com/GreatLazyMan/simplescheduler/pkg/apis/config/scheme"
-	"github.com/GreatLazyMan/simplescheduler/pkg/plugins"
+	"github.com/GreatLazyMan/simplescheduler/pkg/plugins/coschedule"
 	"k8s.io/component-base/cli"
 	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for rest client metric registration
+	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 )
 
 func main() {
-
 	command := app.NewSchedulerCommand(
-		app.WithPlugin(plugins.Name, plugins.New),
+		app.WithPlugin(coschedule.Name, coschedule.New),
 	)
 
 	logs.InitLogs()
@@ -21,10 +22,4 @@ func main() {
 
 	code := cli.Run(command)
 	os.Exit(code)
-
-	//if err := command.Execute(); err != nil {
-	//	_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-	//	os.Exit(1)
-	//}
-
 }

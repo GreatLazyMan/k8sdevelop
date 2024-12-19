@@ -34,6 +34,10 @@ func (c *FakeGreatlazymanV1) RealClusters() v1.RealClusterInterface {
 	return &FakeRealClusters{c}
 }
 
+func (c *FakeGreatlazymanV1) SimpleJobs(namespace string) v1.SimpleJobInterface {
+	return &FakeSimpleJobs{c, namespace}
+}
+
 func (c *FakeGreatlazymanV1) VirtualClusters() v1.VirtualClusterInterface {
 	return &FakeVirtualClusters{c}
 }

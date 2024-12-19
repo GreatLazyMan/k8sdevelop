@@ -29,10 +29,10 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&SimplePluginArgs{}, func(obj interface{}) { SetObjectDefaults_SimplePluginArgs(obj.(*SimplePluginArgs)) })
+	scheme.AddTypeDefaultingFunc(&CoschedulePluginArgs{}, func(obj interface{}) { SetObjectDefaults_CoschedulePluginArgs(obj.(*CoschedulePluginArgs)) })
 	return nil
 }
 
-func SetObjectDefaults_SimplePluginArgs(in *SimplePluginArgs) {
-	SetDefaults_SimplePluginArgs(in)
+func SetObjectDefaults_CoschedulePluginArgs(in *CoschedulePluginArgs) {
+	SetDefaults_CoschedulePluginArgs(in)
 }

@@ -28,7 +28,7 @@ LDFLAGS="$(util::version_ldflags "${VERSION:-}") ${LDFLAGS:-}"
 function build_binary() {
   local -r target=$1
 
-  IFS="," read -ra platforms &lt;&lt;&lt; "${BUILD_PLATFORMS:-}"
+  IFS="," read -ra platforms <<< "${BUILD_PLATFORMS:-}"
   if [[ ${#platforms[@]} -eq 0 ]]; then
     platforms=("$(util:host_platform)")
   fi

@@ -1,0 +1,237 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: simple-scheduler-clusterrole
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+      - events
+    verbs:
+      - create
+      - get
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - delete
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - bindings
+      - pods/binding
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - patch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - replicationcontrollers
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+      - extensions
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "storage.k8s.io"
+    resources:
+      - storageclasses
+      - csinodes
+      - csistoragecapacities
+      - csidrivers
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - update
+  - apiGroups:
+      - "events.k8s.io"
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - "simple.io"
+    resources:
+      - podgroups
+      - queues
+    verbs:
+      - create
+      - get
+      - list
+      - update
+      - patch
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: simple-scheduler-sa
+  namespace: kube-system
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: simple-scheduler-clusterrolebinding
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: simple-scheduler-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: simple-scheduler-sa
+    namespace: kube-system
+
+---
+#https://kubernetes.io/docs/reference/config-api/kube-scheduler-config.v1/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scheduler-config
+  namespace: kube-system
+data:
+  scheduler-config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1
+    kind: KubeSchedulerConfiguration
+    leaderElection:
+      leaderElect: true
+      resourceName: simple-scheduler
+      resourceNamespace: kube-system
+    profiles:
+    - schedulerName: simple-scheduler
+      plugins:
+        preFilter:
+          enabled:
+          - name: CoschedulePlugin
+        filter:
+          enabled:
+          - name: CoschedulePlugin
+        postFilter:
+          enabled:
+          - name: CoschedulePlugin
+        preBind:
+          enabled:
+          - name: CoschedulePlugin
+        permit:
+          enabled:
+          - name: CoschedulePlugin
+        reserve:
+          enabled:
+          - name: CoschedulePlugin
+      pluginConfig:
+      - name: CoschedulePlugin
+        args:
+          deploymentName: "nginx"
+          image: "nginx:xxx"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-scheduler
+  namespace: kube-system
+  labels:
+    component: simple-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: simple-scheduler
+  template:
+    metadata:
+      labels:
+        component: simple-scheduler
+    spec:
+      serviceAccount: simple-scheduler-sa
+      priorityClassName: system-cluster-critical
+      volumes:
+        - name: scheduler-config
+          configMap:
+            name: scheduler-config
+      containers:
+      - name: scheduler-ctrl
+        image: ghcr.io/greatlazyman/simplescheduler:unknown
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/simplescheduler
+        - --config=/etc/kubernetes/scheduler-config.yaml
+        - --pod-max-in-unschedulable-pods-duration=10s
+        resources:
+          requests:
+            cpu: "50m"
+        volumeMounts:
+          - name: scheduler-config
+            mountPath: /etc/kubernetes

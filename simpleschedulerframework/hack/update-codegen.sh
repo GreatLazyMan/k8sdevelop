@@ -42,3 +42,41 @@ kube::codegen::gen_helpers \
 #    --output-dir "${SCRIPT_ROOT}/pkg/apis/example.com/v1/" \
 #    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
 #    "${SCRIPT_ROOT}"/pkg/apis \
+#
+TMPDIR=/tmp/
+PLURAL_EXCEPTIONS="Endpoints:Endpoints,ResourceClaimParameters:ResourceClaimParameters,ResourceClassParameters:ResourceClassParameters"
+
+rm -rf "${SCRIPT_ROOT}"/pkg/apis/client/clientset
+source "${CODEGEN_PKG}/kube_codegen.sh"
+
+kube::codegen::gen_client \
+    "./pkg/apis/crd" \
+    --with-watch \
+    --output-dir "${TMPDIR}/github.com/GreatLazyMan/simplescheduler/pkg/apis/client" \
+    --output-pkg "github.com/GreatLazyMan/simplescheduler/pkg/apis/client" \
+    --plural-exceptions ${PLURAL_EXCEPTIONS} \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+
+
+#kube::codegen::gen_helpers \
+#    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate/boilerplate.go.txt" \
+#    "$PWD/apis"
+cp -r "${TMPDIR}/github.com/GreatLazyMan/simplescheduler/." ./
+
+kube::codegen::gen_helpers \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "$PWD/pkg"
+
+# https://github.com/kubernetes/kubernetes/pull/124219/files
+echo "Generating with register-gen"
+if ! which register-gen
+then
+  GO111MODULE=on go install k8s.io/code-generator/cmd/register-gen
+fi
+
+register-gen \
+  --go-header-file hack/boilerplate.go.txt \
+  --output-file=zz_generated.register.go \
+  github.com/GreatLazyMan/simplescheduler/pkg/apis/crd/simpleio/v1
+

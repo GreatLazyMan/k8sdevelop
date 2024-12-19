@@ -191,6 +191,8 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
+	// Sort potentialVictims by pod priority from high to low, which ensures to
+	// reprieve higher priority pods first.
 	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
@@ -225,6 +227,11 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 			return nil, 0, framework.AsStatus(err)
 		}
 	}
+
+	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of priority from high to low.
+	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
+		sort.Slice(victims, func(i, j int) bool { return util.MoreImportantPod(victims[i], victims[j]) })
+	}
 	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
 }
 
@@ -253,7 +260,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			podPriority := corev1helpers.PodPriority(pod)
 			for _, p := range nodeInfo.Pods {
-				if corev1helpers.PodPriority(p.Pod) < podPriority && podTerminatingByPreemption(p.Pod, pl.fts.EnablePodDisruptionConditions) {
+				if corev1helpers.PodPriority(p.Pod) < podPriority && podTerminatingByPreemption(p.Pod) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
@@ -268,15 +275,10 @@ func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVicti
 	return nil
 }
 
-// podTerminatingByPreemption returns the pod's terminating state if feature PodDisruptionConditions is not enabled.
-// Otherwise, it additionally checks if the termination state is caused by scheduler preemption.
-func podTerminatingByPreemption(p *v1.Pod, enablePodDisruptionConditions bool) bool {
+// podTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
+func podTerminatingByPreemption(p *v1.Pod) bool {
 	if p.DeletionTimestamp == nil {
 		return false
-	}
-
-	if !enablePodDisruptionConditions {
-		return true
 	}
 
 	for _, condition := range p.Status.Conditions {

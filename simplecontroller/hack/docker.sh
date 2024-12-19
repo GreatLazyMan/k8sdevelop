@@ -29,7 +29,7 @@ set -o pipefail
 REPO_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${REPO_ROOT}/hack/util.sh"
 
-REGISTRY=${REGISTRY:-"docker.io/clusterlink"}
+REGISTRY=${REGISTRY:-"docker.io/simpleio"}
 VERSION=${VERSION:="unknown"}
 DOCKER_BUILD_ARGS=${DOCKER_BUILD_ARGS:-}
 
@@ -38,9 +38,6 @@ function build_images() {
   local -r output_type=${OUTPUT_TYPE:-docker}
   local platforms="${BUILD_PLATFORMS:-"$(util:host_platform)"}"
   local dockerfile="Dockerfile"
-  if [[ "${target}" == "clusterlink-floater" ]]; then
-    dockerfile="floater.Dockerfile"
-  fi
 
   # Preferentially use `docker build`. If we are building multi platform,
   # or cross building, change to `docker buildx build`
@@ -57,10 +54,13 @@ function build_local_image() {
   local -r target=$2
   local -r platform=$3
 
-  local -r image_name="${REGISTRY}/${target}:${VERSION}"
+  image_name="${REGISTRY}/${target}:${VERSION}"
+  image_name=$(echo $image_name | tr '[:upper:]' '[:lower:]')
 
   echo "Building image for ${platform}: ${image_name}"
   set -x
+  # https://stackoverflow.com/questions/20481225/how-can-i-use-a-local-image-as-the-base-image-with-a-dockerfile
+  # DOCKER_BUILDKIT=0  docker build -t YOUR_TAG --pull=false .
   sudo docker build --build-arg BINARY="${target}" \
           ${DOCKER_BUILD_ARGS} \
           --tag "${image_name}" \
@@ -95,7 +95,7 @@ function build_cross_image() {
 function isCross() {
   local platforms=$1
 
-  IFS="," read -ra platform_array &lt;&lt;&lt; "${platforms}"
+  IFS="," read -ra platform_array <<< "${platforms}"
   if [[ ${#platform_array[@]} -ne 1 ]]; then
     echo true
     return

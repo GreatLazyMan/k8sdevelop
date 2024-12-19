@@ -23,7 +23,6 @@ import (
 
 	"github.com/GreatLazyMan/simplecontroller/pkg/apis/client/clientset/versioned"
 	simplecontrollerv1 "github.com/GreatLazyMan/simplecontroller/pkg/apis/simplecontroller/v1"
-	"github.com/GreatLazyMan/simplecontroller/pkg/simplecontroller/constants"
 )
 
 type ClusterController struct {
@@ -86,14 +85,14 @@ func (c *ClusterController) Reconcile(ctx context.Context, request reconcile.Req
 	if err := c.Get(ctx, request.NamespacedName, resource); err != nil {
 		if errors.IsNotFound(err) {
 			klog.Infof("Cluster %s has be deleted", request.Name)
+			return controllerruntime.Result{}, nil
 		}
 		klog.Errorf("get Cluster %s error:", err)
-		return controllerruntime.Result{
-			RequeueAfter: constants.DefaultRequeueTime,
-			Requeue:      true}, err
+		return controllerruntime.Result{}, err
 	}
 	if !resource.DeletionTimestamp.IsZero() {
 		klog.Infof("Cluster %s has been deleted", request.Name)
+		return controllerruntime.Result{}, nil
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
