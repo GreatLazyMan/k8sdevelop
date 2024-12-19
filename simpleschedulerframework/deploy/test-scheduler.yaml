@@ -12,7 +12,7 @@ spec:
       labels:
         app: test-scheduler
     spec:
-      schedulerName: sample-scheduler
+      schedulerName: simple-scheduler
       containers:
       - image: docker.io/library/nginx:1.27-alpine3.19
         imagePullPolicy: IfNotPresent

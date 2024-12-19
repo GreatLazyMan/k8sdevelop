@@ -1,7 +1,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: sample-scheduler-clusterrole
+  name: simple-scheduler-clusterrole
 rules:
   - apiGroups:
       - ""
@@ -128,21 +128,21 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sample-scheduler-sa
+  name: simple-scheduler-sa
   namespace: kube-system
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: sample-scheduler-clusterrolebinding
+  name: simple-scheduler-clusterrolebinding
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: sample-scheduler-clusterrole
+  name: simple-scheduler-clusterrole
 subjects:
   - kind: ServiceAccount
-    name: sample-scheduler-sa
+    name: simple-scheduler-sa
     namespace: kube-system
 
 ---
@@ -157,10 +157,10 @@ data:
     kind: KubeSchedulerConfiguration
     leaderElection:
       leaderElect: true
-      resourceName: sample-scheduler
+      resourceName: simple-scheduler
       resourceNamespace: kube-system
     profiles:
-    - schedulerName: sample-scheduler
+    - schedulerName: simple-scheduler
       plugins:
         preFilter:
           enabled:
@@ -180,21 +180,21 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sample-scheduler
+  name: simple-scheduler
   namespace: kube-system
   labels:
-    component: sample-scheduler
+    component: simple-scheduler
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: sample-scheduler
+      component: simple-scheduler
   template:
     metadata:
       labels:
-        component: sample-scheduler
+        component: simple-scheduler
     spec:
-      serviceAccount: sample-scheduler-sa
+      serviceAccount: simple-scheduler-sa
       priorityClassName: system-cluster-critical
       volumes:
         - name: scheduler-config
