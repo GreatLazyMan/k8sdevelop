@@ -18,8 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/GreatLazyMan/simplecontroller/pkg/simplecontroller/constants"
 )
 
 type PodController struct {
@@ -73,11 +71,10 @@ func (c *PodController) Reconcile(ctx context.Context, request reconcile.Request
 	if err := c.Get(ctx, request.NamespacedName, resource); err != nil {
 		if errors.IsNotFound(err) {
 			klog.Infof("Pod %s has be deleted", request.Name)
+			return controllerruntime.Result{}, nil
 		}
 		klog.Errorf("get Pod %s error:", err)
-		return controllerruntime.Result{
-			RequeueAfter: constants.DefaultRequeueTime,
-			Requeue:      true}, err
+		return controllerruntime.Result{}, err
 	}
 	if !resource.DeletionTimestamp.IsZero() {
 		klog.Infof("Pod %s has been deleted", request.Name)

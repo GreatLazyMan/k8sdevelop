@@ -1,0 +1,7 @@
+apiVersion: greatlazyman.io/v1
+kind: SimpleJob
+metadata:
+  name: default
+spec:
+  image: busybox:latest
+  command: ["tail","-f","/dev/null"]

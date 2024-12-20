@@ -63,6 +63,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterList{},
 		&RealCluster{},
 		&RealClusterList{},
+		&SimpleJob{},
+		&SimpleJobList{},
 		&VirtualCluster{},
 		&VirtualClusterList{},
 	)

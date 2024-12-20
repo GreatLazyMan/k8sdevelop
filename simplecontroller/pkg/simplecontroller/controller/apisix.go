@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	apisixv2 "github.com/apache/apisix-ingress-controller/pkg/kube/apisix/apis/config/v2"
+	apisixv "github.com/apache/apisix-ingress-controller/pkg/kube/apisix/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -26,6 +27,7 @@ type ApisixRouteController struct {
 	EventRecorder record.EventRecorder
 	Name          string
 	Clientset     *kubernetes.Clientset
+	ApisixClient  *apisixv.Clientset
 }
 
 var ApisixRoutePredicatesFunc = predicate.Funcs{
@@ -48,14 +50,19 @@ var ApisixRoutePredicatesFunc = predicate.Funcs{
 }
 
 func (c *ApisixRouteController) SetupWithManager(mgr manager.Manager) error {
-	// 换一种写法
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(c.Config)
 	if err != nil {
-		klog.Errorf("get clientset error: %v", clientset)
+		klog.Errorf("get clientset error: %v", err)
 		return err
 	}
 	c.Clientset = clientset
+	asClientset, err := apisixv.NewForConfig(c.Config)
+	if err != nil {
+		klog.Errorf("get clientset error: %v", err)
+		return err
+	}
+	c.ApisixClient = asClientset
 
 	return controllerruntime.NewControllerManagedBy(mgr).
 		Named(c.Name).

@@ -1,14 +1,14 @@
 package constants
 
 import (
-  "time"
+	"time"
 )
 
 const (
 	SimplecontrollerControllerName = "simplecontroller"
 
-	SimplecontrollerFinalizerName   = "GreatLazyMan.io/simplecontroller-finalizer"
+	SimplecontrollerFinalizerName = "GreatLazyMan.io/simplecontroller-finalizer"
 
-  DefaultNamespace = "greatlazyman-system"
-  DefaultRequeueTime = 10 * time.Second
+	DefaultNamespace   = "greatlazyman-system"
+	DefaultRequeueTime = 30 * time.Second
 )

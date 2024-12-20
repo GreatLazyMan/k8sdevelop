@@ -1,6 +1,9 @@
 # github.com/apache/apisix-ingress-controller v1.8.3
 ## explicit; go 1.20
 github.com/apache/apisix-ingress-controller/pkg/kube/apisix/apis/config/v2
+github.com/apache/apisix-ingress-controller/pkg/kube/apisix/client/clientset/versioned
+github.com/apache/apisix-ingress-controller/pkg/kube/apisix/client/clientset/versioned/scheme
+github.com/apache/apisix-ingress-controller/pkg/kube/apisix/client/clientset/versioned/typed/config/v2
 github.com/apache/apisix-ingress-controller/pkg/types
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11

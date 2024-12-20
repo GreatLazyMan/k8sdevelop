@@ -4,19 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: (devel)
-  name: clusters.greatlazyman.io
+  name: simplejobs.greatlazyman.io
 spec:
   group: greatlazyman.io
   names:
-    kind: Cluster
-    listKind: ClusterList
-    plural: clusters
-    singular: cluster
-  scope: Cluster
+    categories:
+    - clusternet
+    kind: SimpleJob
+    listKind: SimpleJobList
+    plural: simplejobs
+    singular: simplejob
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.Options.ipFamily
-      name: IP_FAMILY
+    - jsonPath: .spec.replica
+      name: Replica
       type: string
     name: v1
     schema:
@@ -40,33 +42,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: Spec is the specification for the behaviour of the cluster.
+            description: Spec is the specification for the behaviour of the real cluster.
             properties:
-              kubeconfig:
-                format: byte
+              command:
+                items:
+                  type: string
+                type: array
+              image:
                 type: string
-              namespace:
-                default: greatlazyman-system
-                type: string
-              options:
-                properties:
-                  cni:
-                    default: calico
-                    type: string
-                  crdslice:
-                    items:
-                      type: string
-                    type: array
-                  enable:
-                    default: true
-                    type: boolean
-                  ipFamily:
-                    default: all
-                    type: string
-                type: object
+              replica:
+                default: 1
+                type: integer
             type: object
           status:
-            description: Status describes the current status of a cluster.
+            description: Status describes the current status of a real cluster.
             properties:
               subStatus:
                 description: SubStatus contain some information

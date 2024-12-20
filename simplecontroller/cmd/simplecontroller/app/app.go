@@ -96,10 +96,10 @@ func controllerruntimeRun(ctx context.Context, mgr manager.Manager, cherr chan e
 		Name:          controllerClusterName,
 		Client:        mgr.GetClient(),
 		Config:        mgr.GetConfig(),
-		EventRecorder: mgr.GetEventRecorderFor(controllerPodName),
+		EventRecorder: mgr.GetEventRecorderFor(controllerClusterName),
 	}
 	if err := SimplecontrollerClusterController.SetupWithManager(mgr); err != nil {
-		cherr <- fmt.Errorf("error starting %s: %v", controllerPodName, err)
+		cherr <- fmt.Errorf("error starting %s: %v", controllerClusterName, err)
 	}
 
 	apisixRouteCRD := apisixv2.SchemeGroupVersion.WithKind("ApisixRoute")
@@ -110,7 +110,28 @@ func controllerruntimeRun(ctx context.Context, mgr manager.Manager, cherr chan e
 		}
 		klog.Errorf("no match crd %s err: %v", apisixRouteCRD.String(), err)
 	} else {
+		controllerApisixName := "Simplecontroller-Apisix-controller"
+		SimplecontrollerApisixController := controller.ApisixRouteController{
+			Name:          controllerApisixName,
+			Client:        mgr.GetClient(),
+			Config:        mgr.GetConfig(),
+			EventRecorder: mgr.GetEventRecorderFor(controllerApisixName),
+		}
+		if err := SimplecontrollerApisixController.SetupWithManager(mgr); err != nil {
+			cherr <- fmt.Errorf("error starting %s: %v", controllerApisixName, err)
+		}
+	}
 
+	controllerSimpleJobName := "Simplecontroller-SimpleJob-controller"
+	SimplecontrollerSimpleJobController := controller.SimpleJobController{
+		Name:          controllerSimpleJobName,
+		Client:        mgr.GetClient(),
+		Config:        mgr.GetConfig(),
+		EventRecorder: mgr.GetEventRecorderFor(controllerSimpleJobName),
+		Scheme:        mgr.GetScheme(),
+	}
+	if err := SimplecontrollerSimpleJobController.SetupWithManager(mgr); err != nil {
+		cherr <- fmt.Errorf("error starting %s: %v", controllerSimpleJobName, err)
 	}
 
 	klog.Infof("is Elected: %v", mgr.Elected())
@@ -224,12 +245,12 @@ func leaderElectionRun(ctx context.Context, opts *options.Options) error {
 
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
-				klog.Warning("leader-election got, clustertree is awaking")
+				klog.Warning("leader-election got, simplecontroller is awaking")
 				_ = run(ctx, mgr)
 				os.Exit(0)
 			},
 			OnStoppedLeading: func() {
-				klog.Warning("leader-election lost, clustertree is dying")
+				klog.Warning("leader-election lost, simplecontroller is dying")
 				os.Exit(0)
 			},
 		},

@@ -55,6 +55,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatlazyman().V1().Clusters().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("realclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatlazyman().V1().RealClusters().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("simplejobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatlazyman().V1().SimpleJobs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("virtualclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatlazyman().V1().VirtualClusters().Informer()}, nil
 

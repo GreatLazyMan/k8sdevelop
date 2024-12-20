@@ -26,6 +26,8 @@ type Interface interface {
 	Clusters() ClusterInformer
 	// RealClusters returns a RealClusterInformer.
 	RealClusters() RealClusterInformer
+	// SimpleJobs returns a SimpleJobInformer.
+	SimpleJobs() SimpleJobInformer
 	// VirtualClusters returns a VirtualClusterInformer.
 	VirtualClusters() VirtualClusterInformer
 }
@@ -49,6 +51,11 @@ func (v *version) Clusters() ClusterInformer {
 // RealClusters returns a RealClusterInformer.
 func (v *version) RealClusters() RealClusterInformer {
 	return &realClusterInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// SimpleJobs returns a SimpleJobInformer.
+func (v *version) SimpleJobs() SimpleJobInformer {
+	return &simpleJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // VirtualClusters returns a VirtualClusterInformer.

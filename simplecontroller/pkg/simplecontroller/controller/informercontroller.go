@@ -92,11 +92,14 @@ func NewController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme,
 		corev1.EventSource{Component: constants.SimplecontrollerControllerName})
 
+	/*
+		提升查询效率： 索引器允许你为缓存的数据创建索引，从而提高查询效率。当你需要按特定字段或属性查询对象时，索引器可以显著提升检索速度。
+		支持复杂查询： 索引器使得你能够进行更加复杂的查询。例如，按标签、字段或任意自定义属性进行查询。
+	*/
 	indexer := cache.Indexers{
 		ByindexBySvcLabels: indexBySvcLabels,
 	}
-	var controller *Controller
-	controller = &Controller{
+	controller := &Controller{
 		workqueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "logConfig"),
 		kubeClientset: kubeClientset,
 		svcsLister:    svcInformer.Lister(),
@@ -107,8 +110,12 @@ func NewController(
 
 	klog.Info("Setting up event handlers")
 
-	svcInformer.Informer().AddIndexers(indexer)
-	svcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	err := svcInformer.Informer().AddIndexers(indexer)
+	if err != nil {
+		klog.Errorf("svc add indexer error: %v", err)
+		return nil
+	}
+	_, err = svcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svc := obj.(*corev1.Service)
 			if svc.Spec.Selector == nil {
@@ -131,8 +138,12 @@ func NewController(
 			controller.enqueueForDelete(obj, EventService)
 		},
 	})
+	if err != nil {
+		klog.Errorf("add indexer error: %v", err)
+		return nil
+	}
 
-	epInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = epInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ep := obj.(*corev1.Endpoints)
 			if len(ep.Subsets) == 0 {
@@ -152,6 +163,10 @@ func NewController(
 			controller.enqueueForDelete(obj, EventEndpoints)
 		},
 	})
+	if err != nil {
+		klog.Errorf("ep add EventHandler error: %v", err)
+		return nil
+	}
 
 	return controller
 }
