@@ -6,10 +6,12 @@ import (
 	"os"
 	"time"
 
+	apisixv2 "github.com/apache/apisix-ingress-controller/pkg/kube/apisix/apis/config/v2"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -98,6 +100,17 @@ func controllerruntimeRun(ctx context.Context, mgr manager.Manager, cherr chan e
 	}
 	if err := SimplecontrollerClusterController.SetupWithManager(mgr); err != nil {
 		cherr <- fmt.Errorf("error starting %s: %v", controllerPodName, err)
+	}
+
+	apisixRouteCRD := apisixv2.SchemeGroupVersion.WithKind("ApisixRoute")
+	_, err := mgr.GetRESTMapper().RESTMapping(apisixRouteCRD.GroupKind(), apisixRouteCRD.Version)
+	if err != nil {
+		if !meta.IsNoMatchError(err) {
+			cherr <- err
+		}
+		klog.Errorf("no match crd %s err: %v", apisixRouteCRD.String(), err)
+	} else {
+
 	}
 
 	klog.Infof("is Elected: %v", mgr.Elected())

@@ -4,7 +4,7 @@ import (
 	"os"
 
 	_ "github.com/GreatLazyMan/simplescheduler/pkg/apis/config/scheme"
-	"github.com/GreatLazyMan/simplescheduler/pkg/plugins"
+	"github.com/GreatLazyMan/simplescheduler/pkg/plugins/coschedule"
 	"k8s.io/component-base/cli"
 	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
@@ -13,7 +13,7 @@ import (
 func main() {
 
 	command := app.NewSchedulerCommand(
-		app.WithPlugin(plugins.Name, plugins.New),
+		app.WithPlugin(coschedule.Name, coschedule.New),
 	)
 
 	logs.InitLogs()
