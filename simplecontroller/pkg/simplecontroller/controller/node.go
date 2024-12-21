@@ -82,6 +82,7 @@ func (c *NodeController) Reconcile(ctx context.Context, request reconcile.Reques
 	}
 	if !resource.DeletionTimestamp.IsZero() {
 		klog.Infof("Node %s has been deleted", request.Name)
+		return controllerruntime.Result{}, nil
 	}
 
 	return controllerruntime.Result{}, nil

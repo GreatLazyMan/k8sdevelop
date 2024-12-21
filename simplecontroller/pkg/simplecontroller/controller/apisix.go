@@ -78,12 +78,14 @@ func (c *ApisixRouteController) Reconcile(ctx context.Context, request reconcile
 	if err := c.Get(ctx, request.NamespacedName, resource); err != nil {
 		if errors.IsNotFound(err) {
 			klog.Infof("ApisixRoute %s has be deleted", request.Name)
+			return controllerruntime.Result{}, nil
 		}
 		klog.Errorf("get ApisixRoute %s error:", err)
 		return controllerruntime.Result{}, err
 	}
 	if !resource.DeletionTimestamp.IsZero() {
 		klog.Infof("ApisixRoute %s has been deleted", request.Name)
+		return controllerruntime.Result{}, nil
 	}
 
 	return controllerruntime.Result{}, nil

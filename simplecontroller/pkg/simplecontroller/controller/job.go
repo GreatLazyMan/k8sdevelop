@@ -191,19 +191,19 @@ func getOwnObjEventhandler[T client.Object](mgr manager.Manager) handler.TypedEv
 }
 
 func (c *SimpleJobController) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	klog.Infof("Start reconcile SimpleJob %s", request.Name)
-	defer klog.Infof("Finish reconcile SimpleJob %s", request.Name)
+	klog.Infof("Start reconcile SimpleJob %s", request.String())
+	defer klog.Infof("Finish reconcile SimpleJob %s", request.String())
 	resource := &simplecontrollerv1.SimpleJob{} //TODO
 	if err := c.Get(ctx, request.NamespacedName, resource); err != nil {
 		if errors.IsNotFound(err) {
-			klog.Infof("SimpleJob %s has be deleted", request.Name)
+			klog.Infof("SimpleJob %s has be deleted", request.String())
 			return controllerruntime.Result{}, nil
 		}
 		klog.Errorf("get SimpleJob %s error:", err)
 		return controllerruntime.Result{}, err
 	}
 	if !resource.DeletionTimestamp.IsZero() {
-		klog.Infof("SimpleJob %s has been deleted", request.Name)
+		klog.Infof("SimpleJob %s has been deleted", request.String())
 		return c.removeFinalizer(ctx, request)
 	}
 	if err := c.CreateTask(ctx, request, resource); err != nil {
@@ -216,6 +216,8 @@ func (c *SimpleJobController) Reconcile(ctx context.Context, request reconcile.R
 
 func (c *SimpleJobController) CreateTask(ctx context.Context, request reconcile.Request,
 	resource *simplecontrollerv1.SimpleJob) error {
+	klog.Infof("start create task for %s", request.String())
+	defer klog.Infof("finish create task for %s", request.String())
 	jobPod := &corev1.Pod{}
 	jobPod.Spec.Containers = []corev1.Container{{}}
 	jobPod.SetName(fmt.Sprintf("%s-pod", request.Name))
@@ -229,7 +231,9 @@ func (c *SimpleJobController) CreateTask(ctx context.Context, request reconcile.
 	if err := c.Create(ctx, jobPod); err != nil {
 		if !errors.IsAlreadyExists(err) {
 			klog.Errorf("create pods error: %v", err)
+			return err
 		}
+		klog.Infof("pods %s exist, skip", jobPod.Name)
 	}
 
 	return nil

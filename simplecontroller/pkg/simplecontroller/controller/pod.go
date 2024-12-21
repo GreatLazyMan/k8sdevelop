@@ -78,6 +78,7 @@ func (c *PodController) Reconcile(ctx context.Context, request reconcile.Request
 	}
 	if !resource.DeletionTimestamp.IsZero() {
 		klog.Infof("Pod %s has been deleted", request.Name)
+		return controllerruntime.Result{}, nil
 	}
 
 	return controllerruntime.Result{}, nil
