@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -138,11 +139,14 @@ func getOwnPredicate[T client.Object]() predicate.TypedFuncs[T] {
 			objKind := e.Object.GetObjectKind().GroupVersionKind().Kind
 			switch objKind {
 			case PodKind:
-				klog.Info("receive pod info")
+				klog.Infof("receive own pod %s info", e.Object.GetName())
+				if pod, ok := client.Object(e.Object).(*corev1.Pod); ok {
+					klog.Infof("pod spec is %v", pod.Spec)
+				}
 			case ServiceKind:
-				klog.Info("receive svc info")
+				klog.Infof("receive own svc %s info", e.Object.GetName())
 			case ConfigmapKind:
-				klog.Info("receive cm info")
+				klog.Infof("receive own cm %s info", e.Object.GetName())
 			default:
 				return false
 			}
@@ -158,11 +162,18 @@ func getOwnPredicate[T client.Object]() predicate.TypedFuncs[T] {
 			objKind := newObj.GetObjectKind().GroupVersionKind().Kind
 			switch objKind {
 			case PodKind:
-				klog.Info("receive pod info")
+				klog.Infof("receive own pod %s info", newObj.GetName())
+				newpod, newok := client.Object(newObj).(*corev1.Pod)
+				oldpod, oldok := client.Object(oldObj).(*corev1.Pod)
+				if newok && oldok {
+					if !equality.Semantic.DeepEqual(newpod.Spec, oldpod.Spec) {
+						return false
+					}
+				}
 			case ServiceKind:
-				klog.Info("receive svc info")
+				klog.Infof("receive own svc %s info", newObj.GetName())
 			case ConfigmapKind:
-				klog.Info("receive cm info")
+				klog.Infof("receive own cm %s info", newObj.GetName())
 			default:
 				return false
 			}
