@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-
 	command := app.NewSchedulerCommand(
 		app.WithPlugin(coschedule.Name, coschedule.New),
 	)
@@ -21,10 +20,4 @@ func main() {
 
 	code := cli.Run(command)
 	os.Exit(code)
-
-	//if err := command.Execute(); err != nil {
-	//	_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-	//	os.Exit(1)
-	//}
-
 }

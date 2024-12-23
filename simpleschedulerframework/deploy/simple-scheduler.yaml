@@ -164,13 +164,13 @@ data:
       plugins:
         preFilter:
           enabled:
-          - name: SimplePlugin
+          - name: CoschedulePlugin
         filter:
           enabled:
-          - name: SimplePlugin
+          - name: CoschedulePlugin
         preBind:
           enabled:
-          - name: SimplePlugin
+          - name: CoschedulePlugin
       pluginConfig:
       - name: SimplePlugin
         args:
@@ -202,10 +202,10 @@ spec:
             name: scheduler-config
       containers:
         - name: scheduler-ctrl
-          image: simpleschedulerframework:v0.0.1
+          image: ghcr.io/greatlazyman/simplescheduler:unknown
           imagePullPolicy: IfNotPresent
           command:
-            - /usr/local/bin/simplescheduler
+            - /bin/simplescheduler
             - --config=/etc/kubernetes/scheduler-config.yaml
           resources:
             requests:

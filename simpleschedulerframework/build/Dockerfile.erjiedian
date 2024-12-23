@@ -9,7 +9,7 @@ RUN cd /root/simpleschedulerframework && go mod tidy && go mod vendor && go buil
 
 
 FROM m.daocloud.io/docker.io/library/alpine:latest
-RUN apk add ip6tables iptables curl tcpdump busybox-extras nftables
+#RUN apk add ip6tables iptables curl tcpdump busybox-extras nftables
 COPY --from=builder /root/simpleschedulerframework/simplescheduler /usr/local/bin/simplescheduler
 RUN chmod 755 /usr/local/bin/simplescheduler
 
