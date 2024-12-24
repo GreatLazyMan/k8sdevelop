@@ -74,7 +74,7 @@ func (sp *CoschedulePlugin) PreBind(ctx context.Context, state *framework.CycleS
 
 // type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Plugin, error)
 func New(_ context.Context, plArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
-	args, ok := plArgs.(*config.SimplePluginArgs)
+	args, ok := plArgs.(*config.CoschedulePluginArgs)
 	if !ok {
 		if plArgs == nil {
 			klog.Warning("plArgs is nil")
@@ -83,7 +83,7 @@ func New(_ context.Context, plArgs runtime.Object, f framework.Handle) (framewor
 			return nil, fmt.Errorf("expected PluginConfig, got %T,raw: %s", xx, string(xx.Raw))
 		}
 	} else if ok {
-		klog.Infof("get plugin config args: %+v", args)
+		klog.Infof("get plugin config args: %s", args.GetArgs())
 	}
 	scheme := runtime.NewScheme()
 	_ = clientscheme.AddToScheme(scheme)

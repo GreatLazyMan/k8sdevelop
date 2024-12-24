@@ -172,10 +172,10 @@ data:
           enabled:
           - name: CoschedulePlugin
       pluginConfig:
-      - name: SimplePlugin
+      - name: CoschedulePlugin
         args:
           deploymentName: "nginx"
-          image: "nginx"
+          image: "nginx:xxx"
 ---
 apiVersion: apps/v1
 kind: Deployment
