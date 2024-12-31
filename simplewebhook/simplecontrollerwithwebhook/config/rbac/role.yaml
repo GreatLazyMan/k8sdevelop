@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - simple.io.github.com
+  resources:
+  - apps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - simple.io.github.com
+  resources:
+  - apps/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - simple.io.github.com
+  resources:
+  - apps/status
+  verbs:
+  - get
+  - patch
+  - update

@@ -1,0 +1,56 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: simplewebhook-system/simplewebhook-serving-cert
+  name: mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-simple-io-github-com-v1-app
+  failurePolicy: Fail
+  name: mapp-v1.kb.io
+  rules:
+  - apiGroups:
+    - simple.io.github.com
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - apps
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: simplewebhook-system/simplewebhook-serving-cert
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-simple-io-github-com-v1-app
+  failurePolicy: Fail
+  name: vapp-v1.kb.io
+  rules:
+  - apiGroups:
+    - simple.io.github.com
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - apps
+  sideEffects: None

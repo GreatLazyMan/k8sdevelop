@@ -1,0 +1,56 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: my-webhook
+webhooks:
+- name: com.muta.webhook  # 命名有要求为至少有3个点
+  sideEffects: NoneOnDryRun
+  failurePolicy: Fail
+  objectSelector:
+    matchExpressions:
+    - key: "test"
+      values:
+      - "test"
+      operator: In
+  admissionReviewVersions: ["v1"]
+  clientConfig:
+    service:
+      name: my-webhook
+      path: "/mutate"
+      port: 443
+      namespace: ${NAMESPACE} 
+    caBundle: ${CABundle}
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["services", "pods"]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: my-webhook
+webhooks:
+- name: com.validate.webhook
+  rules:
+  - apiGroups: ["apps", ""]
+    apiVersions: ["v1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["services"]
+  sideEffects: None
+  failurePolicy: Fail
+  admissionReviewVersions: ["v1"]
+  objectSelector:
+    matchExpressions:
+    - key: "test"
+      values:
+      - "test"
+      operator: In
+  clientConfig:
+    caBundle: ${CABundle}
+    service:
+      name: my-webhook
+      path: /validate
+      port: 443
+      namespace: ${NAMESPACE} 

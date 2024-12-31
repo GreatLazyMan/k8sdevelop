@@ -1,0 +1,9 @@
+apiVersion: simple.io.github.com/v1
+kind: App
+metadata:
+  labels:
+    app.kubernetes.io/name: simplewebhook
+    app.kubernetes.io/managed-by: kustomize
+  name: app-sample
+spec:
+  # TODO(user): Add fields here

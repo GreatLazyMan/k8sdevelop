@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-my-webhook
+  namespace: default
+spec:
+  internalTrafficPolicy: Cluster
+  externalIPs:
+  - 192.1.1.1
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: https-my-webhook
+    port: 443
+    protocol: TCP
+    targetPort: 9443
+  selector:
+    xxx: xxx
+  sessionAffinity: None
+  type: ClusterIP
