@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -159,6 +160,16 @@ func informerRun(ctx context.Context, cherr chan error, restConfig *rest.Config)
 	}
 	rcController := controller.NewRClusterReconsiler(ctx, versionClientset)
 	go rcController.Start()
+
+	dynamiClientset, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		klog.Errorf("Init kubernetes client err: %v", err)
+		cherr <- err
+	}
+	ippoolController := controller.NewIPPoolReconsiler(ctx, dynamiClientset)
+	if ippoolController != nil {
+		go ippoolController.Start()
+	}
 
 	kubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(clientset, 0,
 		informers.WithTweakListOptions(func(lo *metav1.ListOptions) {
