@@ -1,0 +1,72 @@
+---
+# role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: demo
+rules:
+- apiGroups: [""]
+  resources: ["services/proxy"]
+  verbs: ["get", "list"]
+---
+# rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: demo
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: demo
+  namespace: default
+roleRef:
+  kind: Role
+  name: demo
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: demo
+  name: demo
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: demo
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: demo
+    spec:
+      containers:
+      - image: docker.io/simple.io/demo:amd64-v1.0 
+        imagePullPolicy: IfNotPresent
+        name: demo
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccount: demo
+      serviceAccountName: demo
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
