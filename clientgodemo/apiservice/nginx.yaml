@@ -1,0 +1,113 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: serving-cert  # this name should match the one appeared in kustomizeconfig.yaml
+spec:
+  dnsNames:
+  - nginx-for-apiservice.default.svc
+  - nginx-for-apiservice.default.svc.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: selfsigned-issuer
+  secretName: nginx-cert # this secret will not be prefixed, since it's not managed by kustomize
+---
+apiVersion: v1
+data:
+  nginx.conf: |
+    worker_processes auto;
+    pid /run/nginx.pid;
+    
+    events {
+      worker_connections 768;
+    }
+    
+    http {
+    
+      sendfile on;
+      tcp_nopush on;
+      tcp_nodelay on;
+      keepalive_timeout 65;
+      types_hash_max_size 2048;
+    
+      default_type application/octet-stream;
+    
+    
+    
+      access_log /var/log/nginx/access.log;
+      error_log /var/log/nginx/error.log;
+    
+    
+       server {
+          listen 443 ssl;
+          server_name k8s.test.com;
+          ssl_certificate  /etc/nginx/ssl/tls.crt;
+          ssl_certificate_key /etc/nginx/ssl/tls.key;
+          location / {
+            default_type application/json;
+            return 200 '{"status":"success","result":"nginx json"}';
+          }
+        }
+    }
+kind: ConfigMap
+metadata:
+  name: nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-for-apiservice
+  labels:
+    app: nginx-for-apiservice
+spec:
+  selector:
+    app: nginx-for-apiservice
+  ports:
+  - port: 443
+    targetPort: 443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-for-apiservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-for-apiservice
+  template:
+    metadata:
+      labels:
+        app: nginx-for-apiservice
+    spec:
+      containers:
+      - name: nginx
+        image: docker.io/library/nginx:1.27-alpine3.19 
+        ports:
+        - containerPort: 443
+        volumeMounts:
+        - mountPath: /etc/nginx
+          name: nginx
+          readOnly: true
+        - mountPath: /etc/nginx/ssl/
+          name: certs
+          readOnly: true
+      volumes:
+      - name: certs
+        secret:
+          defaultMode: 420
+          secretName: nginx-cert
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: nginx.conf
+            path: nginx.conf
+          name: nginx
+        name: nginx
