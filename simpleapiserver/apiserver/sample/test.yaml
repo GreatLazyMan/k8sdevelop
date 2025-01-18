@@ -1,0 +1,16 @@
+apiVersion: simple.io/v1beta1
+kind: Foo
+metadata:
+  name: myfoo
+spec:
+  config:
+    msg: testmsg
+    msg1: "hi, thereí ½í±‹"
+  image: nginx
+status:
+  conditions:
+    - status: "True"
+      type: Worker
+    - status: "True"
+      type: Config
+  phase: Ready
