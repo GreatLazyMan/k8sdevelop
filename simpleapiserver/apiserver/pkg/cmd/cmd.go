@@ -50,6 +50,8 @@ type Options struct {
 
 	EnableAdmission bool
 	Admission       *genericoptions.AdmissionOptions
+
+	RecommendedOptions *genericoptions.RecommendedOptions
 }
 
 func (o *Options) Flags() (fs cliflag.NamedFlagSets) {
@@ -59,7 +61,7 @@ func (o *Options) Flags() (fs cliflag.NamedFlagSets) {
 	o.SecureServing.AddFlags(fs.FlagSet("apiserver secure serving"))
 	o.Features.AddFlags(fs.FlagSet("features"))
 
-	msfs.BoolVar(&o.EnableEtcdStorage, "enable-etcd-storage", false, "If true, store objects in etcd")
+	msfs.BoolVar(&o.EnableEtcdStorage, "enable-etcd-storage", true, "If true, store objects in etcd")
 	o.Etcd.AddFlags(fs.FlagSet("Etcd"))
 
 	msfs.BoolVar(&o.EnableAuth, "enable-auth", o.EnableAuth, "If true, enable authn and authz")
@@ -139,16 +141,18 @@ func (o Options) ServerConfig() (*myapiserver.Config, error) {
 }
 
 func (o Options) ApiserverConfig() (*genericapiserver.RecommendedConfig, error) {
+	// 检查证书是否可以读取，如果不可以则尝试生成自签名证书
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
-
+	// 创建推荐配置
 	serverConfig := genericapiserver.NewRecommendedConfig(myapiserver.Codecs)
 	if err := o.SecureServing.ApplyTo(&serverConfig.SecureServing, &serverConfig.LoopbackClientConfig); err != nil {
 		return nil, err
 	}
 
 	// enable OpenAPI schemas
+	// 暴露OpenAPI端点
 	namer := openapinamer.NewDefinitionNamer(myapiserver.Scheme)
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, namer)
 	serverConfig.OpenAPIConfig.Info.Title = "hello.simple.dev-server"
@@ -282,6 +286,10 @@ func runCommand(o *Options, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+
+	server.GenericAPIServer.AddPostStartHookOrDie("post-starthook", func(ctx genericapiserver.PostStartHookContext) error {
+		return nil
+	})
 
 	return server.GenericAPIServer.PrepareRun().RunWithContext(context.Background())
 }

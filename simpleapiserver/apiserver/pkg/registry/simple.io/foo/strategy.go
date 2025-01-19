@@ -14,6 +14,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	hello "github.com/greatlazyman/apiserver/pkg/apis/simple.io/v1beta1"
@@ -77,6 +78,7 @@ func (fooStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
 func (fooStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	klog.Info("update foo")
 }
 
 func (fooStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -160,6 +162,7 @@ func (fooStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newFoo.DeletionTimestamp = nil
 
 	newFoo.OwnerReferences = oldFoo.OwnerReferences
+	klog.Info("update status")
 }
 
 func (fooStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
