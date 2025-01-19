@@ -61,7 +61,7 @@ func (o *Options) Flags() (fs cliflag.NamedFlagSets) {
 	o.SecureServing.AddFlags(fs.FlagSet("apiserver secure serving"))
 	o.Features.AddFlags(fs.FlagSet("features"))
 
-	msfs.BoolVar(&o.EnableEtcdStorage, "enable-etcd-storage", true, "If true, store objects in etcd")
+	msfs.BoolVar(&o.EnableEtcdStorage, "enable-etcd-storage", false, "If true, store objects in etcd")
 	o.Etcd.AddFlags(fs.FlagSet("Etcd"))
 
 	msfs.BoolVar(&o.EnableAuth, "enable-auth", o.EnableAuth, "If true, enable authn and authz")
@@ -74,9 +74,6 @@ func (o *Options) Flags() (fs cliflag.NamedFlagSets) {
 
 // Complete fills in fields required to have valid data
 func (o *Options) Complete() error {
-	o.Etcd.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(hellov1.SchemeGroupVersion, schema.GroupKind{Group: hellov1.GroupName})
-	// opts.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	o.Etcd.DefaultStorageMediaType = "application/json"
 	o.SecureServing.BindPort = 6443
 	disallow.Register(o.Admission.Plugins)
 	o.Admission.RecommendedPluginOrder = append(o.Admission.RecommendedPluginOrder, "DisallowFoo")
@@ -108,6 +105,9 @@ func (o Options) ServerConfig() (*myapiserver.Config, error) {
 	}
 
 	if o.EnableEtcdStorage {
+		o.Etcd.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(hellov1.SchemeGroupVersion, schema.GroupKind{Group: hellov1.GroupName})
+		// opts.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
+		o.Etcd.DefaultStorageMediaType = "application/json"
 		storageConfigCopy := o.Etcd.StorageConfig
 		if storageConfigCopy.StorageObjectCountTracker == nil {
 			storageConfigCopy.StorageObjectCountTracker = apiservercfg.StorageObjectCountTracker
