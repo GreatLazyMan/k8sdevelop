@@ -36,6 +36,14 @@ var _ rest.StandardStorage = &store{}
 var _ rest.Scoper = &store{}
 var _ rest.Storage = &store{}
 
+/*
+https://mp.weixin.qq.com/s/AHwIwWp-XC86R0zgcnkEug?poc_token=HJ8cjWejhS1GGyForK9nlBJtt76riyksT10JdMUs
+https://github.com/acorn-io/mink
+// Note: the rest.StandardStorage interface aggregates the common REST verbs
+var _ rest.StandardStorage = &Store{}
+var _ rest.Exporter = &Store{}
+var _ rest.TableConvertor = &Store{}
+*/
 // NewStore instantiates a new file storage
 func NewFileStore(groupResource schema.GroupResource, codec runtime.Codec, rootpath string, isNamespaced bool,
 	newFunc func() runtime.Object, newListFunc func() runtime.Object, tc rest.TableConvertor) rest.Storage {
