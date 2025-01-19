@@ -1,4 +1,4 @@
-package v1beta1
+package simple
 
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"

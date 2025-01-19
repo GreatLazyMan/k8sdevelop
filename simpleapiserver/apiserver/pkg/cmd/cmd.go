@@ -74,6 +74,10 @@ func (o *Options) Flags() (fs cliflag.NamedFlagSets) {
 
 // Complete fills in fields required to have valid data
 func (o *Options) Complete() error {
+	o.Etcd.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(hellov1.SchemeGroupVersion, schema.GroupKind{Group: hellov1.GroupName})
+	// opts.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
+	o.Etcd.DefaultStorageMediaType = "application/json"
+	o.SecureServing.BindPort = 6443
 	disallow.Register(o.Admission.Plugins)
 	o.Admission.RecommendedPluginOrder = append(o.Admission.RecommendedPluginOrder, "DisallowFoo")
 	return nil
@@ -215,7 +219,7 @@ func (o Options) restConfig() (*rest.Config, error) {
 }
 
 // NewHelloServerCommand provides a CLI handler for the metrics server entrypoint
-func NewHelloServerCommand(stopCh <-chan struct{}) *cobra.Command {
+func NewApiServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	opts := &Options{
 		SecureServing: genericoptions.NewSecureServingOptions().WithLoopback(),
 		// if just encode as json and store to etcd, just do this
@@ -229,11 +233,12 @@ func NewHelloServerCommand(stopCh <-chan struct{}) *cobra.Command {
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 		Admission:      genericoptions.NewAdmissionOptions(),
 	}
-	opts.Etcd.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(hellov1.SchemeGroupVersion, schema.GroupKind{Group: hellov1.GroupName})
-	// opts.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	opts.Etcd.DefaultStorageMediaType = "application/json"
-	opts.SecureServing.BindPort = 6443
-
+	/*
+		opts.Etcd.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(hellov1.SchemeGroupVersion, schema.GroupKind{Group: hellov1.GroupName})
+		// opts.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
+		opts.Etcd.DefaultStorageMediaType = "application/json"
+		opts.SecureServing.BindPort = 6443
+	*/
 	cmd := &cobra.Command{
 		Short: "Launch simple.io",
 		Long:  "Launch simple.io",
@@ -288,6 +293,7 @@ func runCommand(o *Options, stopCh <-chan struct{}) error {
 	}
 
 	server.GenericAPIServer.AddPostStartHookOrDie("post-starthook", func(ctx genericapiserver.PostStartHookContext) error {
+		servercfg.GenericConfig.SharedInformerFactory.Start(stopCh)
 		return nil
 	})
 

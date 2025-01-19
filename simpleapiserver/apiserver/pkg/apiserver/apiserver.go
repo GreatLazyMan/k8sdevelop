@@ -10,7 +10,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	clientrest "k8s.io/client-go/rest"
 
-	hello "github.com/greatlazyman/apiserver/pkg/apis/simple.io/v1beta1"
+	hello "github.com/greatlazyman/apiserver/pkg/apis/simple.io"
 	installhello "github.com/greatlazyman/apiserver/pkg/apis/simple.io/v1beta1"
 	installtransformation "github.com/greatlazyman/apiserver/pkg/apis/transformation/v1beta1"
 	fooregistry "github.com/greatlazyman/apiserver/pkg/registry/simple.io/foo"
@@ -25,6 +25,7 @@ var (
 )
 
 func init() {
+	hello.Install(Scheme)
 	installhello.Install(Scheme)
 	installtransformation.Install(Scheme)
 
@@ -96,7 +97,7 @@ func (c completedConfig) New() (*HelloApiServer, error) {
 		GenericAPIServer: genericServer,
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(hello.GroupName, Scheme,
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(installhello.GroupName, Scheme,
 		metav1.ParameterCodec, Codecs)
 
 	restStorage, err := fooregistry.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
@@ -104,8 +105,7 @@ func (c completedConfig) New() (*HelloApiServer, error) {
 		return nil, err
 	}
 	v1storage := map[string]rest.Storage{"foos": restStorage.Foo, "foos/base64": restStorage.Base64}
-	v2storage := map[string]rest.Storage{"foos": restStorage.Foo, "foos/config": restStorage.Config,
-		"foos/status": restStorage.Status, "foos/base64": restStorage.Base64}
+	v2storage := map[string]rest.Storage{"foos": restStorage.Foo, "foos/base64": restStorage.Base64}
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1storage
 	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v2storage
 

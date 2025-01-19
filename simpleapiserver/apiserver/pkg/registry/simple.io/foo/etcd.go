@@ -12,6 +12,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
+	simpleio "github.com/greatlazyman/apiserver/pkg/apis/simple.io"
 	hello "github.com/greatlazyman/apiserver/pkg/apis/simple.io/v1beta1"
 )
 
@@ -21,8 +22,6 @@ type REST struct {
 
 type fooStorage struct {
 	Foo    *REST
-	Config *ConfigREST
-	Status *StatusREST
 	Base64 *Base64REST
 }
 
@@ -35,11 +34,10 @@ func (*REST) ShortNames() []string {
 // NewREST returns a RESTStorage object that will work against API services.
 func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*fooStorage, error) {
 	strategy := NewStrategy(scheme)
-	statusStrategy := NewStatusStrategy(strategy)
 
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &hello.Foo{} },
-		NewListFunc:               func() runtime.Object { return &hello.FooList{} },
+		NewFunc:                   func() runtime.Object { return &simpleio.Foo{} },
+		NewListFunc:               func() runtime.Object { return &simpleio.FooList{} },
 		PredicateFunc:             MatchFoo,
 		DefaultQualifiedResource:  hello.Resource("foos"),
 		SingularQualifiedResource: hello.Resource("foo"),
@@ -54,13 +52,7 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*foo
 		return nil, err
 	}
 
-	configStore := *store
-	statusStore := *store
-	statusStore.UpdateStrategy = statusStrategy
-	statusStore.ResetFieldsStrategy = statusStrategy
-
-	return &fooStorage{&REST{store}, &ConfigREST{Store: &configStore}, &StatusREST{&statusStore},
-		NewBase64REST(store, scheme)}, nil
+	return &fooStorage{&REST{store}, NewBase64REST(store, scheme)}, nil
 }
 
 // ConfigREST implements the config subresource for a Foo

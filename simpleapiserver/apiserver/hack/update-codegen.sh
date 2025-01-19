@@ -42,6 +42,11 @@ register-gen \
   --output-file=zz_generated.register.go \
   github.com/greatlazyman/apiserver/pkg/apis/transformation/v1beta1
 
+#register-gen \
+#  --go-header-file hack/boilerplate.go.txt \
+#  --output-file=zz_generated.register.go \
+#  github.com/greatlazyman/apiserver/pkg/apis/simple.io
+
 API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR:-"${SCRIPT_ROOT}/hack"}"
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
     report_filename="${API_KNOWN_VIOLATIONS_DIR}/apiextensions_violation_exceptions.list"
