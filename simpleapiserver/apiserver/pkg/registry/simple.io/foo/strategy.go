@@ -3,11 +3,13 @@ package foo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	durationutil "k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
@@ -59,7 +61,7 @@ func (fooStrategy) NamespaceScoped() bool {
 // and should not be modified by the user. (only do reset in put/patch actions, not for create action)
 func (fooStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"hello.zeng.dev/v2": fieldpath.NewSet(
+		"simple.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -68,12 +70,10 @@ func (fooStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 func (fooStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	_ = obj.(*hello.Foo)
-	/*
-		foo.Status = hello.FooStatus{
-			Phase: hello.FooPhaseProcessing,
-		}
-	*/
+	foo := obj.(*hello.Foo)
+	foo.Status = hello.FooStatus{
+		Phase: hello.FooPhaseProcessing,
+	}
 }
 
 func (fooStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -145,7 +145,7 @@ type fooStatusStrategy struct {
 // and should not be modified by the user.
 func (fooStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return map[fieldpath.APIVersion]*fieldpath.Set{
-		"hello.zeng.dev/v2": fieldpath.NewSet(
+		"simple.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 			fieldpath.MakePathOrDie("metadata", "deletionTimestamp"),
 			fieldpath.MakePathOrDie("metadata", "ownerReferences"),
@@ -169,4 +169,17 @@ func (fooStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 // WarningsOnUpdate returns warnings for the given update.
 func (fooStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+func addFoosToTable(table *metav1.Table, foos ...hello.Foo) {
+	for _, foo := range foos {
+		ts := "<unknown>"
+		if timestamp := foo.CreationTimestamp; !timestamp.IsZero() {
+			ts = durationutil.HumanDuration(time.Since(timestamp.Time))
+		}
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Cells:  []interface{}{foo.Name, foo.Status.Phase, ts, foo.Spec.Config.Msg, foo.Spec.Config.Msg1},
+			Object: runtime.RawExtension{Object: &foo},
+		})
+	}
 }

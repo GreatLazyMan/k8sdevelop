@@ -6,7 +6,6 @@ toolchain go1.23.4
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	github.com/phosae/x-kubernetes/api-aggregation-lib v0.0.0-20250107141326-02980ffe6269
 	github.com/spf13/cobra v1.8.1
 	k8s.io/apimachinery v0.32.0
 	k8s.io/apiserver v0.32.0

@@ -188,10 +188,6 @@ github.com/modern-go/reflect2
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/phosae/x-kubernetes/api-aggregation-lib v0.0.0-20250107141326-02980ffe6269
-## explicit; go 1.22.0
-github.com/phosae/x-kubernetes/api-aggregation-lib/pkg/api/hello.zeng.dev
-github.com/phosae/x-kubernetes/api-aggregation-lib/pkg/api/hello.zeng.dev/validation
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors

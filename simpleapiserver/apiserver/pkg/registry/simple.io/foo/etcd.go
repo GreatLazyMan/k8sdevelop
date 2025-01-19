@@ -59,7 +59,8 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*foo
 	statusStore.UpdateStrategy = statusStrategy
 	statusStore.ResetFieldsStrategy = statusStrategy
 
-	return &fooStorage{&REST{store}, &ConfigREST{Store: &configStore}, &StatusREST{&statusStore}, NewBase64REST(store, scheme)}, nil
+	return &fooStorage{&REST{store}, &ConfigREST{Store: &configStore}, &StatusREST{&statusStore},
+		NewBase64REST(store, scheme)}, nil
 }
 
 // ConfigREST implements the config subresource for a Foo
