@@ -1,10 +1,15 @@
 package utils
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// NamespaceIndexName 自定义索引名称
+const NamespaceIndexName = "namespace"
 
 func EnsureFinalizer(obj client.Object, key string) bool {
 	if !CheckFinalizerKeyExist(obj, key) {
@@ -49,4 +54,13 @@ func SetOwnerReference(owner, ownee client.Object) {
 		Controller:         ptr.To(true),
 	}),
 	)
+}
+
+// NamespaceIndexFunc 自定义索引函数，根据对象的命名空间生成索引键
+func NamespaceIndexFunc(obj interface{}) ([]string, error) {
+	metaObj, ok := obj.(metav1.Object)
+	if !ok {
+		return nil, fmt.Errorf("object is not a metav1.Object")
+	}
+	return []string{metaObj.GetNamespace()}, nil
 }

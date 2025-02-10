@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GreatLazyMan/simplecontroller/pkg/utils"
 	appv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,6 +89,14 @@ func (c *DaemonsetController) syncToStdout(key string) error {
 		klog.Errorf("Fetching object with key %s from store failed with %v", key, err)
 		return err
 	}
+	ds := obj.(*appv1.DaemonSet)
+	objs, err := c.indexer.ByIndex(utils.NamespaceIndexName, ds.Namespace)
+	if err != nil {
+		for _, objele := range objs {
+			dsele := objele.(*appv1.DaemonSet)
+			klog.Infof("Namespace %s has daemonset %s", ds.Namespace, dsele.Name)
+		}
+	}
 	if !exists {
 		klog.Infof("DaemonSets %s does not exists anymore\n", key)
 	} else {
@@ -125,6 +134,11 @@ func NewDsReconsiler(ctx context.Context, clientSet kubernetes.Interface) Daemon
 	// 如果设置 resync 的话，则会定期出现 update 事件，因为 resync 的元素都标记为 update 类型了
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, 0) //informers.WithNamespace("kube-system"))
 	dsInformer := informerFactory.Apps().V1().DaemonSets().Informer()
+	// 自定义 Indexer
+	dsInformer.AddIndexers(cache.Indexers{
+		utils.NamespaceIndexName: utils.NamespaceIndexFunc,
+	})
+
 	// 注册回调函数到 informer
 	_, err := dsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		// 元素新增时，直接将事件元素添加到 Workqueue
